@@ -56,7 +56,7 @@ async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     button = KeyboardButton(
         text="🎮 Открыть веб-игру «Теремок»",
         web_app=WebAppInfo(
-            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=3"
+            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=4"
         ),
     )
     markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
