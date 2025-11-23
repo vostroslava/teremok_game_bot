@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 from bot.config import TELEGRAM_TOKEN
-from bot.handlers.common import start, webapp_command, about_model
+from bot.handlers.common import start, webapp_command, about_model, test_command
 from bot.handlers.quiz import start_quiz, process_quiz_answer
 from bot.handlers.simulation import start_sim, process_sim_answer
 
@@ -41,7 +41,7 @@ def main() -> None:
     app.add_handler(CommandHandler("webapp", webapp_command))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Bot is running...")
+    app.add_handler(CommandHandler("test", test_command))
     app.run_polling()
 
 

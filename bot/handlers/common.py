@@ -64,3 +64,17 @@ async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "Запускаю веб-версию симулятора. Нажми на кнопку ниже.",
         reply_markup=markup,
     )
+
+async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Command to launch the interactive diagnostic test WebApp."""
+    button = KeyboardButton(
+        text="🧪 Запустить интерактивный тест",
+        web_app=WebAppInfo(
+            url="https://vostroslava.github.io/teremok_game_bot/webapp/test.html?v=5"
+        ),
+    )
+    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
+    if update.message:
+        await update.message.reply_text("Нажми кнопку ниже, чтобы открыть тест.", reply_markup=markup)
+    else:
+        await update.effective_chat.send_message("Нажми кнопку ниже, чтобы открыть тест.", reply_markup=markup)
