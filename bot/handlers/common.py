@@ -4,36 +4,24 @@ from bot.resources import TYPES
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "Привет! Это прототип игры «Теремок: симулятор менеджера».\n\n"
-        "Часть 1 — тест «Кто есть кто в твоей компании».\n"
-        "Часть 2 — короткая симуляция управленческих решений: как выбор лидеров, премий и работы с токсичностью\n"
-        "влияет на деньги, вовлечённость и риск выгорания.\n\n"
-        "Также ты можешь открыть веб-версию симуляции как мини-приложение в Telegram командой /webapp."
+        "Привет! Это симулятор «Теремок».\n\n"
+        "Часть 1 — тест «Кто есть кто»: определи типажи 6 сотрудников.\n"
+        "Часть 2 — симуляция управления: прими 3 решения и посмотри на последствия.\n\n"
+        "Игра полностью перенесена в веб-формат. Нажми кнопку ниже, чтобы начать."
     )
 
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "▶️ Начать тест «Кто есть кто» (Часть 1)", callback_data="START_QUIZ"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🎮 Симуляция управления (Часть 2)", callback_data="START_SIM"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "ℹ️ Коротко о типажах Теремка", callback_data="ABOUT_MODEL"
-            )
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    button = KeyboardButton(
+        text="🎮 Начать игру",
+        web_app=WebAppInfo(
+            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=3"
+        ),
+    )
+    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
 
     if update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+        await update.message.reply_text(text, reply_markup=markup)
     else:
-        await update.effective_chat.send_message(text, reply_markup=reply_markup)
+        await update.effective_chat.send_message(text, reply_markup=markup)
 
 
 async def about_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -65,7 +53,7 @@ async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     button = KeyboardButton(
         text="🎮 Открыть веб-игру «Теремок»",
         web_app=WebAppInfo(
-            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=2"
+            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=3"
         ),
     )
     markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
