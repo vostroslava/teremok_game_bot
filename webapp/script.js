@@ -5,6 +5,82 @@ if (tg) {
   tg.enableClosingConfirmation();
 }
 
+// Data: Types
+const TYPES = {
+  BIRD: { label: "🐦 Птица", icon: "🐦" },
+  HAMSTER: { label: "🐹 Хомяк", icon: "🐹" },
+  FOX: { label: "🦊 Лиса", icon: "🦊" },
+  RAT: { label: "🐀 Крыса", icon: "🐀" },
+  PRO: { label: "👔 Профи", icon: "👔" },
+  BEAR: { label: "🐻 Медведь", icon: "🐻" },
+  ALPHA: { label: "🅰️ Альфа", icon: "🅰️" },
+  BETA: { label: "🅱️ Бета", icon: "🅱️" },
+};
+
+// Data: Characters (6 people)
+const CHARACTERS = [
+  {
+    id: "mikhail",
+    name: "Михаил",
+    role: "собственник компании",
+    correct_type: "BEAR",
+    description:
+      "Основатель. Ценит стабильность и надёжных людей. Осторожен к новым идеям, долго принимает решения. Если встал за кого-то горой — это навсегда.",
+    explanation:
+      "Классический Медведь: опора на опыт, осторожность к переменам, ценит лояльность и «своих»."
+  },
+  {
+    id: "natalia",
+    name: "Наталья",
+    role: "генеральный директор",
+    correct_type: "ALPHA",
+    description:
+      "Лицо компании. Вдохновляет команду, говорит о ценностях и миссии. Не любит микроменеджмент. Готова на жёсткие решения ради идеи.",
+    explanation:
+      "Альфа-лидер: работает через смыслы и ценности, зажигает людей, задаёт вектор."
+  },
+  {
+    id: "sergey",
+    name: "Сергей",
+    role: "руководитель отдела продаж",
+    correct_type: "BETA",
+    description:
+      "Проводник между верхом и низом. Переводит идеи в задачи. Чувствует людей, защищает команду, но и спрашивает строго. Часто перегружен.",
+    explanation:
+      "Бета-лидер: держит процессы, балансирует интересы, переводит стратегию в тактику."
+  },
+  {
+    id: "katya",
+    name: "Катя",
+    role: "менеджер по продажам",
+    correct_type: "BIRD",
+    description:
+      "Быстро загорается новым: акции, ивенты, движ. Если начинается рутина — скучает и смотрит по сторонам. Ценит свободу и внимание.",
+    explanation:
+      "Птица: тяга к новизне, быстрый старт, быстрое выгорание от рутины."
+  },
+  {
+    id: "marina",
+    name: "Марина",
+    role: "аккаунт-менеджер",
+    correct_type: "FOX",
+    description:
+      "Обаятельна, легко ладит с VIP-клиентами. Любит статусные встречи и мероприятия. Ищет, где выгоднее и перспективнее лично для неё.",
+    explanation:
+      "Лиса: ориентация на статус, выгоду и социальные связи. Важно быть «в центре»."
+  },
+  {
+    id: "anton",
+    name: "Антон",
+    role: "топ-менеджер по продажам",
+    correct_type: "RAT",
+    description:
+      "Делает большую выручку и кичится этим. В курилке ругает руководство. Может шантажировать уходом, если что-то не по его.",
+    explanation:
+      "Крыса: сильный результат, но игра против правил. Использует успех для шантажа."
+  }
+];
+
 // Data: Scenes
 const SCENES = [
   {
@@ -128,6 +204,9 @@ const SCENES = [
 
 // State
 const state = {
+  mode: "QUIZ", // 'QUIZ' or 'SIMULATION'
+  quizIndex: 0,
+  quizScore: 0,
   currentScene: 0,
   money: 100,
   engagement: 70,
@@ -146,14 +225,15 @@ function formatDelta(x) {
   return x >= 0 ? "+" + x : x.toString();
 }
 
-// Renders
-function renderStartScreen() {
-  state.currentScene = 0;
-  state.money = 100;
-  state.engagement = 70;
-  state.risk = 20;
-  state.decisions = [];
+// --- QUIZ LOGIC ---
 
+function renderQuiz() {
+  if (state.quizIndex >= CHARACTERS.length) {
+    startSimulation();
+    return;
+  }
+
+  const char = CHARACTERS[state.quizIndex];
   screen.innerHTML = "";
 
   const card = document.createElement("div");
@@ -161,16 +241,117 @@ function renderStartScreen() {
 
   const title = document.createElement("h2");
   title.className = "card-title";
-  title.textContent = "Готов управлять?";
+  title.textContent = `${char.name} — ${char.role}`;
+
+  const text = document.createElement("p");
+  text.className = "card-text";
+  text.textContent = char.description;
+
+  const question = document.createElement("p");
+  question.className = "card-text";
+  question.style.fontWeight = "600";
+  question.style.marginTop = "1rem";
+  question.textContent = "Кто это по типажу?";
+
+  const grid = document.createElement("div");
+  grid.className = "quiz-grid";
+
+  Object.entries(TYPES).forEach(([code, type]) => {
+    const btn = document.createElement("button");
+    btn.className = "quiz-btn";
+    btn.innerHTML = `<span class="quiz-btn-icon">${type.icon}</span><span>${type.label}</span>`;
+    btn.onclick = () => handleQuizAnswer(code);
+    grid.appendChild(btn);
+  });
+
+  card.appendChild(title);
+  card.appendChild(text);
+  card.appendChild(question);
+  card.appendChild(grid);
+  screen.appendChild(card);
+}
+
+function handleQuizAnswer(selectedCode) {
+  const char = CHARACTERS[state.quizIndex];
+  const isCorrect = selectedCode === char.correct_type;
+
+  if (isCorrect) {
+    state.quizScore++;
+    showFeedback(true, char);
+  } else {
+    showFeedback(false, char, selectedCode);
+  }
+}
+
+function showFeedback(isCorrect, char, selectedCode = null) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay active";
+
+  const card = document.createElement("div");
+  card.className = "modal-card";
+
+  const icon = document.createElement("div");
+  icon.className = "feedback-icon";
+  icon.textContent = isCorrect ? "✅" : "❌";
+
+  const title = document.createElement("div");
+  title.className = "feedback-title";
+  title.textContent = isCorrect ? "Верно!" : "Ошибка";
+
+  const text = document.createElement("div");
+  text.className = "feedback-text";
+
+  if (isCorrect) {
+    text.textContent = char.explanation;
+  } else {
+    const correctLabel = TYPES[char.correct_type].label;
+    text.innerHTML = `Правильный ответ: <b>${correctLabel}</b>.<br><br>${char.explanation}`;
+  }
+
+  const btn = document.createElement("button");
+  btn.className = "btn-feedback";
+  btn.textContent = "Далее";
+  btn.onclick = () => {
+    document.body.removeChild(overlay);
+    state.quizIndex++;
+    renderQuiz();
+  };
+
+  card.appendChild(icon);
+  card.appendChild(title);
+  card.appendChild(text);
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+// --- SIMULATION LOGIC ---
+
+function startSimulation() {
+  state.mode = "SIMULATION";
+  renderSimulationIntro();
+}
+
+function renderSimulationIntro() {
+  screen.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const title = document.createElement("h2");
+  title.className = "card-title";
+  title.textContent = "Часть 2. Управление";
 
   const text = document.createElement("p");
   text.className = "card-text";
   text.textContent =
-    "Тебе предстоит принять 3 сложных решения. Следи за показателями: деньги важны, но если команда выгорит — бизнес рухнет.";
+    `Ты верно определил ${state.quizScore} из ${CHARACTERS.length} сотрудников.\n\n` +
+    "Теперь переходим к практике. Тебе предстоит принять 3 сложных решения. " +
+    "Следи за показателями: деньги, вовлечённость и риск.";
 
   const btnStart = document.createElement("button");
   btnStart.className = "btn btn-primary";
-  btnStart.textContent = "Начать игру";
+  btnStart.textContent = "Начать симуляцию";
   btnStart.onclick = () => {
     renderCurrentScene();
   };
@@ -210,9 +391,6 @@ function renderMetrics(container) {
     fill.style.width = clamp(percent, 0, 100) + "%";
 
     if (isRisk) {
-      // Risk gradient: Green (low) -> Red (high)
-      // We need to invert logic visually if we want green to be 'good' (low risk)
-      // But here we just use a specific gradient for risk
       fill.style.background = "linear-gradient(90deg, #22c55e, #ef4444)";
     }
 
@@ -334,6 +512,46 @@ function renderSummary() {
 
   card.appendChild(list);
   card.appendChild(btnRestart);
+  screen.appendChild(card);
+}
+
+function renderStartScreen() {
+  // Reset all state
+  state.mode = "QUIZ";
+  state.quizIndex = 0;
+  state.quizScore = 0;
+  state.currentScene = 0;
+  state.money = 100;
+  state.engagement = 70;
+  state.risk = 20;
+  state.decisions = [];
+
+  screen.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const title = document.createElement("h2");
+  title.className = "card-title";
+  title.textContent = "Теремок";
+
+  const text = document.createElement("p");
+  text.className = "card-text";
+  text.textContent =
+    "Добро пожаловать в симулятор.\n\n" +
+    "Часть 1: Определи типажи сотрудников.\n" +
+    "Часть 2: Прими управленческие решения.";
+
+  const btnStart = document.createElement("button");
+  btnStart.className = "btn btn-primary";
+  btnStart.textContent = "Начать";
+  btnStart.onclick = () => {
+    renderQuiz();
+  };
+
+  card.appendChild(title);
+  card.appendChild(text);
+  card.appendChild(btnStart);
   screen.appendChild(card);
 }
 
