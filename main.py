@@ -7,7 +7,7 @@ from core.database import ensure_db_exists
 
 import uvicorn
 from web.routes import app as web_app
-from bot.handlers import feedback
+from bot.handlers import common, materials, diagnostics, feedback, faq
 
 async def start_bot(bot: Bot, dp: Dispatcher):
     print("🤖 Бот запускается...")
@@ -16,6 +16,7 @@ async def start_bot(bot: Bot, dp: Dispatcher):
     dp.include_router(materials.router)
     dp.include_router(diagnostics.router)
     dp.include_router(feedback.router)
+    dp.include_router(faq.router)
     
     await dp.start_polling(bot)
 

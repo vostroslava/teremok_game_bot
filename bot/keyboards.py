@@ -8,6 +8,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     builder.row(InlineKeyboardButton(text="🏠 О тренинге «Теремок»", callback_data="about_teremok"))
     builder.row(InlineKeyboardButton(text="👥 Типажи сотрудников", callback_data="types_menu"))
     builder.row(InlineKeyboardButton(text="🧩 Мини-диагностика", callback_data="start_diagnostic"))
+    builder.row(InlineKeyboardButton(text="❓ Частые вопросы (FAQ)", callback_data="faq"))
     
     # Web App Button
     web_app_url = settings.WEB_APP_URL if settings.WEB_APP_URL else "https://google.com" # Fallback if not set

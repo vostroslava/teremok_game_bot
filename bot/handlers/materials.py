@@ -35,9 +35,12 @@ async def cb_type_example(callback: CallbackQuery):
         await callback.answer("Ошибка")
         return
 
-    text = (
-        f"**{data.emoji} {data.name_ru} — Пример из практики**\n\n"
-        f"_{data.example}_"
-    )
+    from core.texts import EXAMPLES_EXTENDED
+    examples = EXAMPLES_EXTENDED.get(type_id, [data.example])
+    
+    text = f"**{data.emoji} {data.name_ru} — Примеры из практики**\n\n"
+    for i, ex in enumerate(examples, 1):
+        text += f"{i}. _{ex}_\n\n"
+    
     # Re-use details keyboard to go back easily to THIS type
     await callback.message.edit_text(text, reply_markup=type_details_keyboard(type_id), parse_mode="Markdown")
