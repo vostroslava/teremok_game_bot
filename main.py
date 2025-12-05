@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher
 import logging
 import asyncio
 from core.config import settings
-from bot.handlers import common, materials, diagnostics
+from bot.handlers import common, materials, diagnostics, lead_form
 from core.database import ensure_db_exists
 
 import uvicorn
@@ -11,8 +11,9 @@ from bot.handlers import common
 
 async def start_bot(bot: Bot, dp: Dispatcher):
     print("🤖 Бот запускается...")
-    # Include only common router
+    # Include routers
     dp.include_router(common.router)
+    dp.include_router(lead_form.router)
     
     # Pass bot instance to web routes for notifications
     from web.routes import set_bot

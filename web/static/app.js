@@ -215,6 +215,133 @@ function showResult() {
     `;
 }
 
+// Lead Form functionality
+const LEAD_QUESTIONS = [
+    { id: 'name', title: 'Как к вам можно обращаться?', hint: 'Ваше имя', type: 'text' },
+    { id: 'role', title: 'Какая у вас роль в компании?', hint: 'Например: собственник, директор по продажам, HR-менеджер, руководитель отдела', type: 'text' },
+    { id: 'company', title: 'Как называется ваша компания?', hint: '', type: 'text' },
+    { id: 'team_size', title: 'Сколько примерно человек в вашем отделе/команде?', hint: 'Можно ответить приблизительно: 5, 10-15, около 50 и т.п.', type: 'text' },
+    { id: 'contacts', title: 'Как с вами лучше связаться?', hint: 'Напишите телефон и/или ссылку на ваш Telegram / e-mail', type: 'text' },
+    { id: 'request', title: 'Коротко опишите вашу ситуацию или запрос', hint: 'Какие задачи или проблемы вы хотите обсудить?', type: 'textarea' }
+];
+
+let leadFormState = {
+    currentStep: 0,
+    answers: {}
+};
+
+function startLeadForm() {
+    leadFormState = { currentStep: 0, answers: {} };
+    document.getElementById('lead-intro').classList.add('hidden');
+    document.getElementById('form-progress').classList.remove('hidden');
+    document.getElementById('lead-form').classList.remove('hidden');
+    showLeadQuestion();
+}
+
+function showLeadQuestion() {
+    const question = LEAD_QUESTIONS[leadFormState.currentStep];
+    const progress = ((leadFormState.currentStep + 1) / LEAD_QUESTIONS.length) * 100;
+
+    document.getElementById('lead-progress-fill').style.width = progress + '%';
+    document.getElementById('progress-text').textContent = `Вопрос ${leadFormState.currentStep + 1} из ${LEAD_QUESTIONS.length}`;
+    document.getElementById('question-title').textContent = question.title;
+    document.getElementById('question-hint').textContent = question.hint;
+
+    const input = document.getElementById('lead-input');
+    const textarea = document.getElementById('lead-textarea');
+
+    if (question.type === 'textarea') {
+        input.classList.add('hidden');
+        textarea.classList.remove('hidden');
+        textarea.value = leadFormState.answers[question.id] || '';
+        textarea.focus();
+    } else {
+        textarea.classList.add('hidden');
+        input.classList.remove('hidden');
+        input.value = leadFormState.answers[question.id] || '';
+        input.focus();
+    }
+}
+
+function nextLeadQuestion() {
+    const question = LEAD_QUESTIONS[leadFormState.currentStep];
+    const input = question.type === 'textarea' ?
+        document.getElementById('lead-textarea') :
+        document.getElementById('lead-input');
+
+    const answer = input.value.trim();
+
+    if (!answer) {
+        alert('Пожалуйста, ответьте на вопрос');
+        return;
+    }
+
+    leadFormState.answers[question.id] = answer;
+
+    if (leadFormState.currentStep < LEAD_QUESTIONS.length - 1) {
+        leadFormState.currentStep++;
+        showLeadQuestion();
+    } else {
+        submitLeadForm();
+    }
+}
+
+async function submitLeadForm() {
+    document.getElementById('lead-form').classList.add('hidden');
+    document.getElementById('form-progress').classList.add('hidden');
+
+    const submitBtn = document.querySelector('.submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Отправка...';
+
+    try {
+        const response = await fetch('/api/submit-lead', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: leadFormState.answers.name,
+                role: leadFormState.answers.role,
+                company: leadFormState.answers.company,
+                team_size: leadFormState.answers.team_size,
+                contacts: leadFormState.answers.contacts,
+                request: leadFormState.answers.request
+            })
+        });
+
+        if (response.ok) {
+            document.getElementById('lead-success').classList.remove('hidden');
+            setTimeout(() => {
+                resetLeadForm();
+            }, 5000);
+        } else {
+            document.getElementById('lead-error').classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('lead-error').classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Далее →';
+    }
+}
+
+function cancelLeadForm() {
+    if (confirm('Вы уверены, что хотите отменить заполнение заявки?')) {
+        resetLeadForm();
+    }
+}
+
+function resetLeadForm() {
+    leadFormState = { currentStep: 0, answers: {} };
+    document.getElementById('lead-intro').classList.remove('hidden');
+    document.getElementById('lead-form').classList.add('hidden');
+    document.getElementById('form-progress').classList.add('hidden');
+    document.getElementById('lead-success').classList.add('hidden');
+    document.getElementById('lead-error').classList.add('hidden');
+    document.getElementById('lead-input').value = '';
+    document.getElementById('lead-textarea').value = '';
+}
+
 // Write to bot function
 function writeToBot() {
     if (window.Telegram && window.Telegram.WebApp) {

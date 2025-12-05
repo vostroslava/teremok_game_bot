@@ -72,29 +72,63 @@
 
         <!-- Contact Section -->
         <section id="contact-section" class="section">
-            <h2 class="section-title">Связаться с нами</h2>
+            <h2 class="section-title">Оставить заявку</h2>
 
-            <div class="contact-card">
-                <p class="contact-intro">Хотите получить консультацию или узнать больше о тренинге?</p>
-
-                <div style="margin: 30px 0;">
-                    <h3 style="color: #667eea; margin-bottom: 20px; text-align: center;">📞 Контакты</h3>
-
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                        <p style="margin: 10px 0;"><strong>📧 Email:</strong> office@stalking.by</p>
-                        <p style="margin: 10px 0;"><strong>☎️ Телефон:</strong> +375 29 113 113 2</p>
-                        <p style="margin: 10px 0;"><strong>🌐 Сайт:</strong> stalking.by</p>
-                        <p style="margin: 10px 0;"><strong>💬 Telegram:</strong> @stalkermedia1</p>
+            <div class="contact-card" id="lead-form-container">
+                <div id="form-progress" class="form-progress hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="lead-progress-fill"></div>
                     </div>
+                    <p class="progress-text" id="progress-text">Вопрос 1 из 6</p>
+                </div>
 
-                    <a href="https://t.me/stalkermedia1" target="_blank" style="text-decoration: none;">
-                        <button class="cta-button" style="margin-top: 20px;">
-                            💬 Написать менеджеру
+                <div id="lead-intro" class="lead-intro">
+                    <p style="font-size: 1.1em; margin-bottom: 20px;">
+                        Заполните короткую форму, и наш менеджер свяжется с вами для обсуждения вашей ситуации.
+                    </p>
+                    <p style="color: #718096; margin-bottom: 30px;">
+                        Это займет не более 2-3 минут.
+                    </p>
+                    <button class="cta-button" onclick="startLeadForm()">
+                        ✅ Начать заполнение
+                    </button>
+                    <p style="margin-top: 20px; text-align: center; color: #718096;">
+                        Или свяжитесь с нами напрямую:<br>
+                        <a href="https://t.me/stalkermedia1" target="_blank"
+                            style="color: #667eea; text-decoration: none;">
+                            💬 @stalkermedia1
+                        </a>
+                    </p>
+                </div>
+
+                <div id="lead-form" class="lead-form hidden">
+                    <h3 id="question-title" class="question-title"></h3>
+                    <p id="question-hint" class="question-hint"></p>
+                    <input type="text" id="lead-input" class="form-input" placeholder="Ваш ответ">
+                    <textarea id="lead-textarea" class="form-input hidden" rows="4" placeholder="Ваш ответ"></textarea>
+
+                    <div class="form-buttons">
+                        <button class="submit-btn" onclick="nextLeadQuestion()">
+                            Далее →
                         </button>
-                    </a>
+                        <button class="cancel-btn" onclick="cancelLeadForm()">
+                            ❌ Отменить
+                        </button>
+                    </div>
+                </div>
 
-                    <p style="text-align: center; color: #718096; margin-top: 15px; font-size: 0.9em;">
-                        Нажмите кнопку выше, чтобы написать нам в Telegram
+                <div id="lead-success" class="form-message success hidden">
+                    <h3>✅ Спасибо! Ваша заявка отправлена.</h3>
+                    <p style="margin-top: 15px;">Менеджер свяжется с вами в ближайшее время.</p>
+                </div>
+
+                <div id="lead-error" class="form-message error hidden">
+                    <h3>⚠️ Не удалось отправить заявку</h3>
+                    <p style="margin-top: 15px;">
+                        Свяжитесь с нами напрямую:<br>
+                        📧 office@stalking.by<br>
+                        📞 +375 29 113 113 2<br>
+                        💬 <a href="https://t.me/stalkermedia1" target="_blank" style="color: white;">@stalkermedia1</a>
                     </p>
                 </div>
             </div>

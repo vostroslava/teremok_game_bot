@@ -7,6 +7,7 @@ class Settings:
     # Telegram Bot
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
     ADMIN_ID: int = int(os.getenv("ADMIN_ID", "0")) if os.getenv("ADMIN_ID") else None
+    MANAGER_CHAT_ID: int = int(os.getenv("MANAGER_CHAT_ID", "0")) if os.getenv("MANAGER_CHAT_ID") else None # Chat ID for lead notifications
     
     # Web App
     WEB_APP_URL: str = os.getenv("WEB_APP_URL", "")  # URL where the Web App is hosted
