@@ -228,7 +228,7 @@ function showSectionWithResult(sectionName) {
 }
 
 // Contact Form Submission
-async function submitContactForm(event) {
+function submitContactForm(event) {
     event.preventDefault();
 
     const submitBtn = document.getElementById('submit-btn');
