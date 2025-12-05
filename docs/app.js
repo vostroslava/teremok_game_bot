@@ -308,29 +308,31 @@ async function submitLeadForm() {
         }
     }
 
+    const payload = {
+        name: leadFormState.answers.name,
+        role: leadFormState.answers.role,
+        company: leadFormState.answers.company,
+        team_size: leadFormState.answers.team_size,
+        contacts: leadFormState.answers.contacts,
+        request: leadFormState.answers.request,
+        telegram_user: telegramUser
+    };
+
     try {
-        const response = await fetch('https://script.google.com/macros/s/AKfycbynDmT5h-8Uui0TPnHJVis58Y1uGf_mVQcCxt7t8AMv0Y0u_8lEyW5UT7vtTOnBNuUE/exec', {
+        // Используем no-cors режим для обхода CORS
+        await fetch('https://script.google.com/macros/s/AKfycbynDmT5h-8Uui0TPnHJVis58Y1uGf_mVQcCxt7t8AMv0Y0u_8lEyW5UT7vtTOnBNuUE/exec', {
             method: 'POST',
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: leadFormState.answers.name,
-                role: leadFormState.answers.role,
-                company: leadFormState.answers.company,
-                team_size: leadFormState.answers.team_size,
-                contacts: leadFormState.answers.contacts,
-                request: leadFormState.answers.request,
-                telegram_user: telegramUser  // Добавляем данные из Telegram
-            })
+            body: JSON.stringify(payload)
         });
 
-        if (response.ok) {
-            document.getElementById('lead-success').classList.remove('hidden');
-            setTimeout(() => {
-                resetLeadForm();
-            }, 5000);
-        } else {
-            document.getElementById('lead-error').classList.remove('hidden');
-        }
+        // В режиме no-cors мы не получим ответ, но если не было exception - значит отправлено
+        document.getElementById('lead-success').classList.remove('hidden');
+        setTimeout(() => {
+            resetLeadForm();
+        }, 5000);
+
     } catch (error) {
         console.error('Error:', error);
         document.getElementById('lead-error').classList.remove('hidden');
