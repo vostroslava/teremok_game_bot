@@ -248,32 +248,32 @@ async function submitContactForm(event) {
     const message = document.getElementById('message').value;
     const result_type = localStorage.getItem('diagnosticResult') || '';
 
+    // Prepare data for Telegram
+    const formData = {
+        type: 'contact_form',
+        name,
+        contact,
+        message,
+        result_type
+    };
+
     try {
-        const response = await fetch('/api/submit-lead', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                name,
-                contact,
-                message,
-                result_type
-            })
-        });
+        // Use Telegram WebApp API to send data to bot
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.sendData(JSON.stringify(formData));
 
-        const data = await response.json();
-
-        if (data.status === 'success') {
+            // Show success message
             successMsg.classList.remove('hidden');
             document.getElementById('contact-form').reset();
             localStorage.removeItem('diagnosticResult');
 
-            // Send success event to Telegram
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.showAlert('Спасибо! Ваша заявка отправлена.');
-            }
+            // Close WebApp after 2 seconds
+            setTimeout(() => {
+                window.Telegram.WebApp.close();
+            }, 2000);
         } else {
+            // Fallback: show error if not in Telegram
+            errorMsg.textContent = '❌ Откройте эту форму через Telegram бота';
             errorMsg.classList.remove('hidden');
         }
     } catch (error) {
