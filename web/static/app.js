@@ -196,6 +196,9 @@ function showResult() {
     const winnerId = sorted[0][0];
     const typeData = TYPES_DATA[winnerId];
 
+    // Save result for contact form
+    localStorage.setItem('diagnosticResult', `${typeData.emoji} ${typeData.name_ru}`);
+
     const content = document.getElementById('diagnostic-content');
     content.innerHTML = `
         <div class="result-card">
@@ -206,7 +209,80 @@ function showResult() {
             <p style="margin-top: 20px; opacity: 0.8; font-size: 0.9em;">Это лишь гипотеза. Для точного результата нужны глубокие собеседования.</p>
         </div>
         <button class="cta-button" style="margin-top: 20px" onclick="startDiagnostic()">Пройти снова</button>
+        <button class="cta-button" style="margin-top: 10px; background: linear-gradient(135deg, #00d4aa 0%, #00b894 100%)" onclick="showSectionWithResult('contact')">
+            Получить консультацию →
+        </button>
     `;
+}
+
+// Show section and pre-fill diagnostic result
+function showSectionWithResult(sectionName) {
+    showSection(sectionName);
+    const result = localStorage.getItem('diagnosticResult');
+    if (result) {
+        const messageField = document.getElementById('message');
+        if (messageField) {
+            messageField.value = `Мой результат диагностики: ${result}\n\nХочу получить консультацию.`;
+        }
+    }
+}
+
+// Contact Form Submission
+async function submitContactForm(event) {
+    event.preventDefault();
+
+    const submitBtn = document.getElementById('submit-btn');
+    const successMsg = document.getElementById('form-success');
+    const errorMsg = document.getElementById('form-error');
+
+    // Hide previous messages
+    successMsg.classList.add('hidden');
+    errorMsg.classList.add('hidden');
+
+    // Disable button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Отправка...';
+
+    const name = document.getElementById('name').value;
+    const contact = document.getElementById('contact').value;
+    const message = document.getElementById('message').value;
+    const result_type = localStorage.getItem('diagnosticResult') || '';
+
+    try {
+        const response = await fetch('/api/submit-lead', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                contact,
+                message,
+                result_type
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            successMsg.classList.remove('hidden');
+            document.getElementById('contact-form').reset();
+            localStorage.removeItem('diagnosticResult');
+
+            // Send success event to Telegram
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.showAlert('Спасибо! Ваша заявка отправлена.');
+            }
+        } else {
+            errorMsg.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorMsg.classList.remove('hidden');
+        console.error('Error:', error);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Отправить заявку';
+    }
 }
 
 // Init

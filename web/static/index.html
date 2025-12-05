@@ -17,6 +17,7 @@
             <button class="nav-btn" onclick="showSection('types')">👥 Типажи</button>
             <button class="nav-btn" onclick="showSection('diagnostic')">🧩 Тест</button>
             <button class="nav-btn" onclick="showSection('faq')">❓ FAQ</button>
+            <button class="nav-btn" onclick="showSection('contact')">📞 Контакт</button>
         </nav>
 
         <!-- Home Section -->
@@ -67,6 +68,34 @@
         <section id="faq-section" class="section">
             <h2 class="section-title">Частые вопросы</h2>
             <div id="faq-list" class="faq-list"></div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact-section" class="section">
+            <h2 class="section-title">Связаться с нами</h2>
+
+            <div class="contact-card">
+                <p class="contact-intro">Есть вопросы или хотите получить консультацию? Оставьте заявку!</p>
+
+                <form id="contact-form" onsubmit="submitContactForm(event)">
+                    <input type="text" id="name" placeholder="Ваше имя *" required class="form-input">
+                    <input type="text" id="contact" placeholder="Телефон или email *" required class="form-input">
+                    <textarea id="message" placeholder="Ваш вопрос или комментарий" rows="4"
+                        class="form-input"></textarea>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        Отправить заявку
+                    </button>
+                </form>
+
+                <div id="form-success" class="form-message success hidden">
+                    ✅ Спасибо! Ваша заявка отправлена. Мы свяжемся с вами в ближайшее время.
+                </div>
+
+                <div id="form-error" class="form-message error hidden">
+                    ❌ Ошибка отправки. Попробуйте еще раз.
+                </div>
+            </div>
         </section>
     </div>
 
