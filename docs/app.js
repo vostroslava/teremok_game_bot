@@ -434,7 +434,7 @@ async function showContactTestResult() {
 
     // Submit to Google Sheets
     try {
-        await fetch('https://script.google.com/macros/s/AKfycbynDmT5h-8Uui0TPnHJVis58Y1uGf_mVQcCxt7t8AMv0Y0u_8lEyW5UT7vtTOnBNuUE/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbxhqPfsDZDD0UTJYE3cA9hv994iqD8ABKeiP_hw2J1qSp4LMOSknupdCEYXzu4KnOZC/exec', {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
