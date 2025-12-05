@@ -1,49 +1,47 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from aiogram import Bot, Dispatcher
+import logging
+import asyncio
+from core.config import settings
+from bot.handlers import common, materials, diagnostics
+from core.database import ensure_db_exists
 
-from bot.config import TELEGRAM_TOKEN
-from bot.handlers.common import start, webapp_command, about_model, test_command
-from bot.handlers.quiz import start_quiz, process_quiz_answer
-from bot.handlers.simulation import start_sim, process_sim_answer
+import uvicorn
+from web.routes import app as web_app
+from bot.handlers import feedback
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    data = query.data
+async def start_bot(bot: Bot, dp: Dispatcher):
+    print("🤖 Бот запускается...")
+    # Include routers
+    dp.include_router(common.router)
+    dp.include_router(materials.router)
+    dp.include_router(diagnostics.router)
+    dp.include_router(feedback.router)
+    
+    await dp.start_polling(bot)
 
-    if data == "START_QUIZ":
-        await start_quiz(update, context)
-        return
+async def start_web():
+    config = uvicorn.Config(web_app, host=settings.HOST, port=settings.PORT, log_level="info")
+    server = uvicorn.Server(config)
+    print(f"🌍 Web App запускается на http://{settings.HOST}:{settings.PORT}")
+    await server.serve()
 
-    if data == "ABOUT_MODEL":
-        await about_model(update, context)
-        return
-
-    if data == "START_SIM":
-        await start_sim(update, context)
-        return
-
-    if data.startswith("QUIZ:"):
-        await process_quiz_answer(update, context)
-        return
-
-    if data.startswith("SIM:"):
-        await process_sim_answer(update, context)
-        return
-
-    await query.answer()
-    await query.edit_message_text("Непонятная команда. Нажми /start, чтобы начать заново.")
-
-
-def main() -> None:
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("webapp", webapp_command))
-    app.add_handler(CallbackQueryHandler(button_handler))
-
-    app.add_handler(CommandHandler("test", test_command))
-    app.run_polling()
-
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    
+    # Init DB
+    await ensure_db_exists()
+    
+    bot = Bot(token=settings.BOT_TOKEN)
+    dp = Dispatcher()
+    
+    # Run both
+    await asyncio.gather(
+        start_bot(bot, dp),
+        start_web()
+    )
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Бот остановлен")

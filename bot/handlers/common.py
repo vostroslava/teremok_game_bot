@@ -1,80 +1,30 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
-from telegram.ext import ContextTypes
-from bot.resources import TYPES
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, CallbackQuery
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    text = (
-        "🏢 **Симулятор «Архитектор Команды»**\n\n"
-        "Ты — ЛПР (Лицо Принимающее Решения). Твоя задача — построить прибыльный бизнес, правильно расставив людей.\n\n"
-        "🔹 **Диагностируй**: Узнай, кто скрывается за маской (Лиса, Птица, Крыса...)\n"
-        "🔹 **Структурируй**: Сформируй **Ядро** (центр принятия решений) и **Команду** (исполнителей).\n"
-        "🔹 **Масштабируй**: Запусти месяц и посмотри на финансовый результат.\n\n"
-        "⚠️ Ошибка в Ядре может стоить бизнеса!\n\n"
-        "Нажми кнопку ниже, чтобы войти в кабинет 👇"
-    )
+from bot.keyboards import main_menu_keyboard
+from core.texts import WELCOME_TEXT, ABOUT_TEREMOK_TEXT
+from core.database import add_user
 
-    button = KeyboardButton(
-        text="🎮 Начать игру",
-        web_app=WebAppInfo(
-            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=3"
-        ),
-    )
-    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
+router = Router()
 
-    if update.message:
-        await update.message.reply_text(text, reply_markup=markup)
-    else:
-        await update.effective_chat.send_message(text, reply_markup=markup)
+@router.message(Command("start"))
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
+    user = message.from_user
+    await add_user(user.id, user.username, user.first_name)
+    await message.answer(WELCOME_TEXT, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
 
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    await message.answer("Используйте меню для навигации.", reply_markup=main_menu_keyboard())
 
-async def about_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
+@router.callback_query(F.data == "main_menu")
+async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(WELCOME_TEXT, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
 
-    text = (
-        "Кратко о типажах модели «Теремок»:\n\n"
-        "🐦 Птица — живёт впечатлениями и новизной; легко загорается и так же легко остывает.\n"
-        "🐹 Хомяк — ценит деньги, стабильность и понятные правила; болезненно реагирует на хаос.\n"
-        "🦊 Лиса — ориентирована на личную выгоду, статус и возможности; сильные социальные навыки.\n"
-        "🐀 Крыса — Лиса, ушедшая в токсик: использует результат и влияние, чтобы играть против системы.\n"
-        "👔 Профессионал — строит мотивацию на качестве, экспертизе и стандартах.\n"
-        "🐻 Медведь — опорный, «тяжёлый» типаж, часто собственник; опирается на прошлый опыт и устойчивость.\n"
-        "🅰️ Альфа-лидер — задаёт идею и ценности, собирает людей вокруг смысла.\n"
-        "🅱️ Бета-лидер — держит команду и процессы, переводит идею в конкретные действия.\n\n"
-        "Часть 1 помогает научиться видеть, кто есть кто.\n"
-        "Часть 2 показывает, как управленческие решения по этим типажам бьют по системе."
-    )
-
-    await context.bot.send_message(chat_id=query.message.chat_id, text=text)
-
-
-async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Команда /webapp — даёт кнопку, открывающую веб-игру (GitHub Pages)
-    как мини-приложение внутри Telegram.
-    """
-    button = KeyboardButton(
-        text="🎮 Открыть веб-игру «Теремок»",
-        web_app=WebAppInfo(
-            url="https://vostroslava.github.io/teremok_game_bot/webapp/?v=4"
-        ),
-    )
-    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
-    await update.message.reply_text(
-        "Запускаю веб-версию симулятора. Нажми на кнопку ниже.",
-        reply_markup=markup,
-    )
-
-async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Command to launch the interactive diagnostic test WebApp."""
-    button = KeyboardButton(
-        text="🧪 Запустить интерактивный тест",
-        web_app=WebAppInfo(
-            url="https://vostroslava.github.io/teremok_game_bot/webapp/test.html?v=5"
-        ),
-    )
-    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
-    if update.message:
-        await update.message.reply_text("Нажми кнопку ниже, чтобы открыть тест.", reply_markup=markup)
-    else:
-        await update.effective_chat.send_message("Нажми кнопку ниже, чтобы открыть тест.", reply_markup=markup)
+@router.callback_query(F.data == "about_teremok")
+async def cb_about(callback: CallbackQuery):
+    await callback.message.edit_text(ABOUT_TEREMOK_TEXT, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
