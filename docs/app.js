@@ -294,8 +294,22 @@ async function submitLeadForm() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Отправка...';
 
+    // Получаем данные пользователя Telegram (если доступны)
+    let telegramUser = null;
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+        const user = window.Telegram.WebApp.initDataUnsafe.user;
+        if (user) {
+            telegramUser = {
+                id: user.id,
+                username: user.username || 'не указан',
+                first_name: user.first_name || '',
+                last_name: user.last_name || ''
+            };
+        }
+    }
+
     try {
-        const response = await fetch('/api/submit-lead', {
+        const response = await fetch('https://script.google.com/macros/s/AKfycbynDmT5h-8Uui0TPnHJVis58Y1uGf_mVQcCxt7t8AMv0Y0u_8lEyW5UT7vtTOnBNuUE/exec', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -304,7 +318,8 @@ async function submitLeadForm() {
                 company: leadFormState.answers.company,
                 team_size: leadFormState.answers.team_size,
                 contacts: leadFormState.answers.contacts,
-                request: leadFormState.answers.request
+                request: leadFormState.answers.request,
+                telegram_user: telegramUser  // Добавляем данные из Telegram
             })
         });
 
