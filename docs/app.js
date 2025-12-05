@@ -215,73 +215,10 @@ function showResult() {
     `;
 }
 
-// Show section and pre-fill diagnostic result
-function showSectionWithResult(sectionName) {
-    showSection(sectionName);
-    const result = localStorage.getItem('diagnosticResult');
-    if (result) {
-        const messageField = document.getElementById('message');
-        if (messageField) {
-            messageField.value = `Мой результат диагностики: ${result}\n\nХочу получить консультацию.`;
-        }
-    }
-}
-
-// Contact Form Submission
-function submitContactForm(event) {
-    event.preventDefault();
-
-    const submitBtn = document.getElementById('submit-btn');
-    const successMsg = document.getElementById('form-success');
-    const errorMsg = document.getElementById('form-error');
-
-    // Hide previous messages
-    successMsg.classList.add('hidden');
-    errorMsg.classList.add('hidden');
-
-    // Disable button
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Отправка...';
-
-    const name = document.getElementById('name').value;
-    const contact = document.getElementById('contact').value;
-    const message = document.getElementById('message').value;
-    const result_type = localStorage.getItem('diagnosticResult') || '';
-
-    // Prepare data for Telegram
-    const formData = {
-        type: 'contact_form',
-        name,
-        contact,
-        message,
-        result_type
-    };
-
-    try {
-        // Use Telegram WebApp API to send data to bot
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.sendData(JSON.stringify(formData));
-
-            // Show success message
-            successMsg.classList.remove('hidden');
-            document.getElementById('contact-form').reset();
-            localStorage.removeItem('diagnosticResult');
-
-            // Close WebApp after 2 seconds
-            setTimeout(() => {
-                window.Telegram.WebApp.close();
-            }, 2000);
-        } else {
-            // Fallback: show error if not in Telegram
-            errorMsg.textContent = '❌ Откройте эту форму через Telegram бота';
-            errorMsg.classList.remove('hidden');
-        }
-    } catch (error) {
-        errorMsg.classList.remove('hidden');
-        console.error('Error:', error);
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Отправить заявку';
+// Write to bot function
+function writeToBot() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.close();
     }
 }
 
