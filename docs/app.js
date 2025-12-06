@@ -69,6 +69,13 @@ let diagnosticState = { currentQuestion: 0, scores: {} };
 
 // Section Navigation
 function showSection(sectionName) {
+    // Check if user tries to access test without completing contacts
+    if (sectionName === 'diagnostic' && !hasCompletedContacts()) {
+        alert('⚠️ Чтобы пройти тест, сначала заполните контактную форму во вкладке "Контакт"');
+        showSection('contact');
+        return;
+    }
+
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
@@ -78,6 +85,30 @@ function showSection(sectionName) {
     if (sectionName === 'types') renderTypesGrid();
     if (sectionName === 'faq') renderFAQ();
     if (sectionName === 'diagnostic') startDiagnostic();
+
+    // Update test button state
+    updateTestButtonState();
+}
+
+// Check if user has completed contacts
+function hasCompletedContacts() {
+    return localStorage.getItem('contacts_completed') === 'true';
+}
+
+// Update test button state (enabled/disabled)
+function updateTestButtonState() {
+    const testBtn = document.querySelector('.nav-btn[onclick*="diagnostic"]');
+    if (testBtn) {
+        if (hasCompletedContacts()) {
+            testBtn.style.opacity = '1';
+            testBtn.style.cursor = 'pointer';
+            testBtn.title = '';
+        } else {
+            testBtn.style.opacity = '0.5';
+            testBtn.style.cursor = 'not-allowed';
+            testBtn.title = 'Сначала заполните контакты';
+        }
+    }
 }
 
 // Types Grid
@@ -311,6 +342,9 @@ async function submitLeadForm() {
         }
     }
 
+    // Mark contacts as completed
+    localStorage.setItem('contacts_completed', 'true');
+
     // Store for later submission with test results
     sessionStorage.setItem('leadContactData', JSON.stringify(contactData));
     sessionStorage.setItem('telegramUser', JSON.stringify(telegramUser));
@@ -503,3 +537,4 @@ function writeToBot() {
 
 // Init
 renderTypesGrid();
+updateTestButtonState();
