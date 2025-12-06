@@ -65,15 +65,32 @@ const DIAGNOSTIC_QUESTIONS = [
     }
 ];
 
-let diagnosticState = { currentQuestion: 0, scores: {} };
+let diagnosticState = { currentQuestion: 0, scores: {}, answers: {} };
+
+// Helper: Get Telegram user data
+function getTelegramUserData() {
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+        const user = window.Telegram.WebApp.initDataUnsafe.user;
+        if (user) {
+            return {
+                id: user.id,
+                username: user.username || 'не указан',
+                first_name: user.first_name || '',
+                last_name: user.last_name || ''
+            };
+        }
+    }
+    return null;
+}
 
 // Section Navigation
-function showSection(sectionName) {
-    // Check if user tries to access test without completing contacts
-    if (sectionName === 'diagnostic' && !hasCompletedContacts()) {
-        alert('⚠️ Чтобы пройти тест, сначала заполните контактную форму во вкладке "Контакт"');
-        showSection('contact');
-        return;
+async function showSection(sectionName) {
+    // Check if user tries to access test - now checks subscription OR contacts
+    if (sectionName === 'diagnostic') {
+        const canAccessTest = await checkTestAccess();
+        if (!canAccessTest) {
+            return; // checkTestAccess() will handle redirect
+        }
     }
 
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -85,29 +102,53 @@ function showSection(sectionName) {
     if (sectionName === 'types') renderTypesGrid();
     if (sectionName === 'faq') renderFAQ();
     if (sectionName === 'diagnostic') startDiagnostic();
-
-    // Update test button state
-    updateTestButtonState();
 }
 
-// Check if user has completed contacts
-function hasCompletedContacts() {
-    return localStorage.getItem('contacts_completed') === 'true';
-}
+// Check if user can access test (subscription OR contacts)
+async function checkTestAccess() {
+    const userData = getTelegramUserData();
 
-// Update test button state (enabled/disabled)
-function updateTestButtonState() {
-    const testBtn = document.querySelector('.nav-btn[onclick*="diagnostic"]');
-    if (testBtn) {
-        if (hasCompletedContacts()) {
-            testBtn.style.opacity = '1';
-            testBtn.style.cursor = 'pointer';
-            testBtn.title = '';
-        } else {
-            testBtn.style.opacity = '0.5';
-            testBtn.style.cursor = 'not-allowed';
-            testBtn.title = 'Сначала заполните контакты';
+    if (!userData) {
+        alert('⚠️ Не удалось определить пользователя Telegram');
+        return false;
+    }
+
+    try {
+        // Check subscription on server
+        const response = await fetch(`/api/check-subscription?user_id=${userData.id}`);
+        const data = await response.json();
+
+        if (data.subscribed) {
+            // Subscribed - can access test
+            console.log('User is subscribed to channel - access granted');
+            return true;
         }
+
+        // Not subscribed - check if has contacts
+        const hasContacts = localStorage.getItem('contacts_completed') === 'true';
+
+        if (hasContacts) {
+            // Has contacts - can access test
+            console.log('User has filled contacts - access granted');
+            return true;
+        }
+
+        // Neither subscribed nor has contacts - show message
+        alert(
+            '⚠️ Для прохождения теста необходимо:\n\n' +
+            `1. Подписаться на наш канал @${data.channel_username}\n` +
+            'ИЛИ\n' +
+            '2. Заполнить контактную форму во вкладке "Контакт"'
+        );
+
+        // Redirect to contact form
+        showSection('contact');
+        return false;
+
+    } catch (error) {
+        console.error('Error checking test access:', error);
+        alert('⚠️ Ошибка при проверке доступа к тесту');
+        return false;
     }
 }
 
@@ -455,47 +496,62 @@ async function showContactTestResult() {
         </div>
     `;
 
-    // Prepare full data for submission
-    const contactData = JSON.parse(sessionStorage.getItem('leadContactData'));
-    const telegramUser = JSON.parse(sessionStorage.getItem('telegramUser'));
+    // Get user data
+    const userData = getTelegramUserData();
 
-    const fullPayload = {
-        ...contactData,
-        telegram_user: telegramUser,
-        test_result: `${typeData.emoji} ${typeData.name_ru}`,
-        test_scores: diagnosticState.scores
-    };
+    if (!userData) {
+        console.error('Cannot get user data for test submission');
+        container.innerHTML = `
+            <div class="form-message error">
+                <h3>⚠️ Ошибка</h3>
+                <p style="margin-top: 15px;">Не удалось определить пользователя</p>
+            </div>
+        `;
+        return;
+    }
 
-    // Submit to Google Sheets
+    // Submit to new API
     try {
-        await fetch('https://script.google.com/macros/s/AKfycbxhqPfsDZDD0UTJYE3cA9hv994iqD8ABKeiP_hw2J1qSp4LMOSknupdCEYXzu4KnOZC/exec', {
+        const response = await fetch('/api/test/submit', {
             method: 'POST',
-            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fullPayload)
+            body: JSON.stringify({
+                user_id: userData.id,
+                answers: diagnosticState.scores
+            })
         });
 
-        // Show final success
-        setTimeout(() => {
-            container.innerHTML = `
-                <div class="form-message success">
-                    <h3>✅ Отлично! Все данные отправлены.</h3>
-                    <p style="margin-top: 15px;">
-                        Ваш результат: <strong>${typeData.emoji} ${typeData.name_ru}</strong>
-                    </p>
-                    <p style="margin-top: 15px;">
-                        Менеджер свяжется с вами в ближайшее время.
-                    </p>
-                </div>
-            `;
+        const data = await response.json();
 
-            // Cleanup
-            sessionStorage.removeItem('leadContactData');
-            sessionStorage.removeItem('telegramUser');
-        }, 1500);
+        if (data.status === 'success') {
+            // Show final success
+            setTimeout(() => {
+                container.innerHTML = `
+                    <div class="form-message success">
+                        <h3>✅ Отлично! Все данные отправлены.</h3>
+                        <p style="margin-top: 15px;">
+                            Ваш результат: <strong>${data.result.emoji} ${data.result.name}</strong>
+                        </p>
+                        <p style="margin-top: 15px;">
+                            ${data.result.description}
+                        </p>
+                        <p style="margin-top: 20px; color: #718096;">
+                            Менеджер свяжется с вами в ближайшее время.
+                        </p>
+                    </div>
+                `;
+
+                // Cleanup
+                sessionStorage.removeItem('leadContactData');
+                sessionStorage.removeItem('telegramUser');
+            }, 1500);
+
+        } else {
+            throw new Error(data.message || 'Unknown error');
+        }
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error submitting test:', error);
         container.innerHTML = `
             <div class="form-message error">
                 <h3>⚠️ Не удалось отправить результаты</h3>
