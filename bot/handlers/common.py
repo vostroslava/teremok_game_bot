@@ -12,17 +12,13 @@ async def cmd_start(message: Message):
         [InlineKeyboardButton(
             text="🌐 Открыть Теремок",
             web_app=WebAppInfo(url=settings.WEB_APP_URL or "https://vostroslava.github.io/teremok_game_bot/")
-        )],
-        [InlineKeyboardButton(
-            text="📝 Оставить заявку",
-            callback_data="start_lead_form"
         )]
     ])
     
     await message.answer(
         "👋 **Добро пожаловать в Теремок!**\n\n"
         "🏢 Модель мотивации сотрудников от Stalker Media\n\n"
-        "Нажмите кнопку ниже, чтобы открыть интерактивное приложение или оставить заявку:",
+        "Нажмите кнопку ниже, чтобы открыть интерактивное приложение:",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )

@@ -287,41 +287,193 @@ function nextLeadQuestion() {
 }
 
 async function submitLeadForm() {
+    // Save contact data
+    const contactData = {
+        name: leadFormState.answers.name,
+        role: leadFormState.answers.role,
+        company: leadFormState.answers.company,
+        team_size: leadFormState.answers.team_size,
+        contacts: leadFormState.answers.contacts,
+        request: leadFormState.answers.request
+    };
+
+    // Get Telegram user if available
+    let telegramUser = null;
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+        const user = window.Telegram.WebApp.initDataUnsafe.user;
+        if (user) {
+            telegramUser = {
+                id: user.id,
+                username: user.username || 'не указан',
+                first_name: user.first_name || '',
+                last_name: user.last_name || ''
+            };
+        }
+    }
+
+    // Store for later submission with test results
+    sessionStorage.setItem('leadContactData', JSON.stringify(contactData));
+    sessionStorage.setItem('telegramUser', JSON.stringify(telegramUser));
+
+    // Hide form and show test intro
     document.getElementById('lead-form').classList.add('hidden');
     document.getElementById('form-progress').classList.add('hidden');
 
-    const submitBtn = document.querySelector('.submit-btn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Отправка...';
+    startContactTest();
+}
 
+function startContactTest() {
+    // Show test intro
+    const container = document.getElementById('lead-form-container');
+    container.innerHTML = `
+        <div class="test-intro" style="text-align: center; padding: 40px 20px;">
+            <h2 style="margin-bottom: 20px;">✅ Спасибо! Контакты сохранены.</h2>
+            <p style="font-size: 1.1em; margin-bottom: 30px; color: #718096;">
+                Теперь предлагаем пройти короткий тест для определения вашего типажа сотрудника.
+            </p>
+            <p style="margin-bottom: 30px; color: #718096;">
+                Это займет 2-3 минуты и поможет нам лучше понять вашу ситуацию.
+            </p>
+            <button class="cta-button" onclick="beginContactTest()">
+                🧩 Начать тест
+            </button>
+        </div>
+    `;
+}
+
+function beginContactTest() {
+    const container = document.getElementById('lead-form-container');
+    diagnosticState = { currentQuestion: 0, scores: {}, answers: [] };
+
+    container.innerHTML = `
+        <div id="test-container">
+            <div class="form-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="test-progress-fill"></div>
+                </div>
+                <p class="progress-text" id="test-progress-text">Вопрос 1 из ${DIAGNOSTIC_QUESTIONS.length}</p>
+            </div>
+            <div id="test-question-container" class="diagnostic-card"></div>
+        </div>
+    `;
+
+    showContactTestQuestion();
+}
+
+function showContactTestQuestion() {
+    const q = DIAGNOSTIC_QUESTIONS[diagnosticState.currentQuestion];
+    const progress = ((diagnosticState.currentQuestion + 1) / DIAGNOSTIC_QUESTIONS.length) * 100;
+
+    document.getElementById('test-progress-fill').style.width = progress + '%';
+    document.getElementById('test-progress-text').textContent =
+        `Вопрос ${diagnosticState.currentQuestion + 1} из ${DIAGNOSTIC_QUESTIONS.length}`;
+
+    const optionsHtml = q.options.map((opt, i) =>
+        `<button class="option-btn" onclick="answerContactTest(${i})">${opt.text}</button>`
+    ).join('');
+
+    document.getElementById('test-question-container').innerHTML = `
+        <h3 class="question-text">${q.text}</h3>
+        ${optionsHtml}
+    `;
+}
+
+function answerContactTest(optionIndex) {
+    const q = DIAGNOSTIC_QUESTIONS[diagnosticState.currentQuestion];
+    const option = q.options[optionIndex];
+    const score = option.score;
+
+    // Save answer
+    diagnosticState.answers.push({
+        question: q.text,
+        answer: option.text
+    });
+
+    // Update scores
+    for (let type in score) {
+        diagnosticState.scores[type] = (diagnosticState.scores[type] || 0) + score[type];
+    }
+
+    diagnosticState.currentQuestion++;
+
+    if (diagnosticState.currentQuestion >= DIAGNOSTIC_QUESTIONS.length) {
+        showContactTestResult();
+    } else {
+        showContactTestQuestion();
+    }
+}
+
+async function showContactTestResult() {
+    const sorted = Object.entries(diagnosticState.scores).sort((a, b) => b[1] - a[1]);
+    const winnerId = sorted[0][0];
+    const typeData = TYPES_DATA[winnerId];
+
+    const container = document.getElementById('lead-form-container');
+    container.innerHTML = `
+        <div class="result-card">
+            <span class="result-emoji">${typeData.emoji}</span>
+            <h2>Ваш типаж:</h2>
+            <h1 style="margin-bottom: 20px">${typeData.name_ru}</h1>
+            <p>${typeData.short_desc}</p>
+            <p style="margin-top: 20px; opacity: 0.8; font-size: 0.9em;">
+                Отправляем результаты менеджеру...
+            </p>
+        </div>
+    `;
+
+    // Prepare full data for submission
+    const contactData = JSON.parse(sessionStorage.getItem('leadContactData'));
+    const telegramUser = JSON.parse(sessionStorage.getItem('telegramUser'));
+
+    const fullPayload = {
+        ...contactData,
+        telegram_user: telegramUser,
+        test_result: `${typeData.emoji} ${typeData.name_ru}`,
+        test_scores: diagnosticState.scores
+    };
+
+    // Submit to Google Sheets
     try {
-        const response = await fetch('/api/submit-lead', {
+        await fetch('https://script.google.com/macros/s/AKfycbxhqPfsDZDD0UTJYE3cA9hv994iqD8ABKeiP_hw2J1qSp4LMOSknupdCEYXzu4KnOZC/exec', {
             method: 'POST',
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: leadFormState.answers.name,
-                role: leadFormState.answers.role,
-                company: leadFormState.answers.company,
-                team_size: leadFormState.answers.team_size,
-                contacts: leadFormState.answers.contacts,
-                request: leadFormState.answers.request
-            })
+            body: JSON.stringify(fullPayload)
         });
 
-        if (response.ok) {
-            document.getElementById('lead-success').classList.remove('hidden');
-            setTimeout(() => {
-                resetLeadForm();
-            }, 5000);
-        } else {
-            document.getElementById('lead-error').classList.remove('hidden');
-        }
+        // Show final success
+        setTimeout(() => {
+            container.innerHTML = `
+                <div class="form-message success">
+                    <h3>✅ Отлично! Все данные отправлены.</h3>
+                    <p style="margin-top: 15px;">
+                        Ваш результат: <strong>${typeData.emoji} ${typeData.name_ru}</strong>
+                    </p>
+                    <p style="margin-top: 15px;">
+                        Менеджер свяжется с вами в ближайшее время.
+                    </p>
+                </div>
+            `;
+
+            // Cleanup
+            sessionStorage.removeItem('leadContactData');
+            sessionStorage.removeItem('telegramUser');
+        }, 1500);
+
     } catch (error) {
         console.error('Error:', error);
-        document.getElementById('lead-error').classList.remove('hidden');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Далее →';
+        container.innerHTML = `
+            <div class="form-message error">
+                <h3>⚠️ Не удалось отправить результаты</h3>
+                <p style="margin-top: 15px;">
+                    Но мы сохранили ваш результат: <strong>${typeData.emoji} ${typeData.name_ru}</strong>
+                </p>
+                <p style="margin-top: 15px;">
+                    Свяжитесь с нами напрямую:<br>
+                    💬 <a href="https://t.me/stalkermedia1" target="_blank" style="color: white;">@stalkermedia1</a>
+                </p>
+            </div>
+        `;
     }
 }
 
