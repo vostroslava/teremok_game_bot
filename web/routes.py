@@ -127,6 +127,21 @@ async def save_user_contacts(request: Request):
             except Exception as e:
                 logger.error(f"Failed to send notification: {e}")
         
+        # Экспорт в Google Sheets
+        try:
+            from core.google_sheets import export_lead_to_sheets
+            await export_lead_to_sheets({
+                "user_id": user_id,
+                "name": data['name'],
+                "role": data['role'],
+                "company": data.get('company', ''),
+                "team_size": data['team_size'],
+                "phone": data['phone'],
+                "telegram_username": data.get('username')
+            })
+        except Exception as e:
+            logger.error(f"Failed to export lead to sheets: {e}")
+        
         return JSONResponse({
             "status": "success", 
             "message": "Контакты сохранены"
@@ -212,6 +227,16 @@ async def submit_test_results(request: Request):
                 result_type=result_type,
                 answers=answers
             )
+        
+        # Экспорт в Google Sheets
+        try:
+            from core.google_sheets import export_test_to_sheets
+            await export_test_to_sheets(
+                test={"user_id": user_id, "result_type": result_type, "scores": result.get('scores', {}), "product": "teremok"},
+                lead=contact
+            )
+        except Exception as e:
+            logger.error(f"Failed to export test to sheets: {e}")
         
         # Возвращаем результат пользователю
         type_info = TYPES_DATA.get(result_type)

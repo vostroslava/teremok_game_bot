@@ -1,75 +1,92 @@
-# Google Sheets Integration
+# Google Sheets Integration (via Webhook)
 
-## Быстрый старт (одна таблица, 2 листа)
+## Быстрая настройка
 
-### 1. Создайте Google таблицу
+Мы используем Google Apps Script как вебхук, чтобы не возиться с сервисными аккаунтами и сложной настройкой прав.
 
-Создайте **одну** таблицу: `Teremok CRM`
+### 1. Подготовка таблицы
 
-Бот автоматически создаст в ней 2 листа:
-- **Лиды** — контакты
-- **Тесты** — результаты тестов
+1. Создайте Google Таблицу (или используйте существующую).
+2. Перейдите в **Расширения** (Extensions) -> **Apps Script**.
+3. Вставьте следующий код в редактор скриптов (файл `Code.gs`):
 
-Скопируйте ID таблицы из URL:
+```javascript
+function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const data = JSON.parse(e.postData.contents);
+  
+  // Определяем лист
+  let sheetName = data.type === 'test' ? 'Тесты' : 'Лиды';
+  let sheet = ss.getSheetByName(sheetName);
+  
+  // Создаём лист, если нет
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    if (data.type === 'test') {
+      sheet.appendRow(['Дата', 'Имя', 'Роль', 'Компания', 'Телефон', 'Результат', 'Баллы', 'Продукт', 'User ID']);
+    } else {
+      sheet.appendRow(['Дата', 'Имя', 'Роль', 'Компания', 'Телефон', 'Telegram', 'Статус', 'Размер команды', 'User ID']);
+    }
+  }
+  
+  // Формируем строку
+  let row = [];
+  if (data.type === 'test') {
+    row = [
+      new Date(),
+      data.name || '',
+      data.role || '',
+      data.company || '',
+      data.phone || '',
+      data.result_type || '',
+      data.scores || '',
+      data.product || 'teremok',
+      data.user_id || ''
+    ];
+  } else {
+    row = [
+      new Date(),
+      data.name || '',
+      data.role || '',
+      data.company || '',
+      data.phone || '',
+      data.telegram || '',
+      data.status || 'new',
+      data.team_size || '',
+      data.user_id || ''
+    ];
+  }
+  
+  sheet.appendRow(row);
+  return ContentService.createTextOutput(JSON.stringify({status: 'ok'}));
+}
 ```
-https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit
-```
 
----
+### 2. Публикация вебхука
 
-### 2. Создайте сервисный аккаунт
+1. Нажмите кнопку **Начать развертывание** (Deploy) -> **Новое развертывание** (New deployment).
+2. Выберите тип: **Веб-приложение** (Web app).
+3. Заполните поля:
+   - **Описание**: Webhook for Teremok Bot
+   - **Выполнять как**: *Про меня* (Me)
+   - **У кого есть доступ**: **Все** (Anyone) — **ВАЖНО!**
+4. Нажмите **Начать развертывание** (Deploy).
+5. Скопируйте **URL веб-приложения**.
 
-1. Откройте [Google Cloud Console](https://console.cloud.google.com/)
-2. Создайте проект → включите **Google Sheets API** и **Google Drive API**
-3. **IAM & Admin** → **Service Accounts** → **Create**
-4. Откройте аккаунт → **Keys** → **Add Key** → **JSON**
-5. Скачайте JSON-файл
+### 3. Настройка бота
 
----
-
-### 3. Дайте доступ к таблице
-
-1. Откройте созданную таблицу
-2. **Поделиться** → добавьте email из JSON (`client_email`)
-3. Права: **Редактор**
-
----
-
-### 4. Настройте .env
+В файле `.env` укажите:
 
 ```bash
 GOOGLE_SHEETS_ENABLED=true
-GOOGLE_SERVICE_ACCOUNT_JSON='<JSON одной строкой>'
-GOOGLE_SHEETS_LEADS_ID=1AbCdEfGhIjKlMnOpQrStUvWxYz
+GOOGLE_SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/AKfycb.../exec
 ```
 
-> **Примечание:** `GOOGLE_SHEETS_TESTS_ID` не нужен — оба листа создаются в одной таблице.
+(Вставьте ваш скопированный URL)
 
 ---
 
-### 5. Перезапустите
+## Проверка
 
-```bash
-pip install gspread google-auth
-python main.py
-```
-
----
-
-## Структура листов
-
-**Лиды:**
-| Дата | Источник | Имя | Роль | Компания | Размер команды | Телефон | Telegram | User ID | Статус | Примечание |
-
-**Тесты:**
-| Дата | Продукт | Имя | Роль | Компания | Размер команды | Телефон | Telegram | User ID | Типаж | Баллы |
-
----
-
-## Troubleshooting
-
-| Ошибка | Решение |
-|--------|---------|
-| `gspread not installed` | `pip install gspread google-auth` |
-| `Permission denied` | Добавьте email сервисного аккаунта в таблицу |
-| `Spreadsheet not found` | Проверьте ID таблицы в .env |
+После настройки, все новые заявки и результаты тестов будут автоматически попадать в таблицу.
+В таблице сами создадутся листы "Лиды" и "Тесты".

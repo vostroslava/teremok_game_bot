@@ -29,10 +29,8 @@ class Settings:
     # Admin Panel
     ADMIN_PANEL_SECRET: str = os.getenv("ADMIN_PANEL_SECRET", "")
     
-    # Google Sheets Integration
+    # Google Sheets Integration (via Apps Script Webhook)
     GOOGLE_SHEETS_ENABLED: bool = os.getenv("GOOGLE_SHEETS_ENABLED", "false").lower() == "true"
-    GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-    GOOGLE_SHEETS_LEADS_ID: str = os.getenv("GOOGLE_SHEETS_LEADS_ID", "")
-    GOOGLE_SHEETS_TESTS_ID: str = os.getenv("GOOGLE_SHEETS_TESTS_ID", "")
+    GOOGLE_SHEETS_WEBHOOK_URL: str = os.getenv("GOOGLE_SHEETS_WEBHOOK_URL", "")
 
 settings = Settings()

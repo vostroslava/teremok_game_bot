@@ -1,307 +1,99 @@
 """
-Google Sheets Integration Module
-Exports leads and test results to Google Sheets
-Supports both: 1 spreadsheet with 2 sheets OR 2 separate spreadsheets
+Google Sheets Integration via Apps Script Webhook
+Simple HTTP POST to Google Apps Script - no auth required
 """
 import json
 import logging
-from typing import Optional, List
+import httpx
+from typing import Optional
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
-# Singleton client instance
-_sheets_client = None
 
-# Sheet names for single-spreadsheet mode
-LEADS_SHEET_NAME = "Лиды"
-TESTS_SHEET_NAME = "Тесты"
-
-
-class GoogleSheetsClient:
-    """Client for Google Sheets API operations"""
+async def send_to_sheets(data: dict) -> bool:
+    """Send data to Google Sheets via webhook"""
+    webhook_url = settings.GOOGLE_SHEETS_WEBHOOK_URL
     
-    def __init__(self, creds_json: str, spreadsheet_id: str, tests_sheet_id: str = None):
-        """
-        Initialize client.
-        
-        Args:
-            creds_json: Service account JSON credentials
-            spreadsheet_id: Main spreadsheet ID (contains both sheets if tests_sheet_id is None)
-            tests_sheet_id: Optional separate spreadsheet for tests (if None, uses sheets in main spreadsheet)
-        """
-        try:
-            import gspread
-            from google.oauth2.service_account import Credentials
-        except ImportError:
-            logger.error("gspread or google-auth not installed. Run: pip install gspread google-auth")
-            raise ImportError("Required packages not installed")
-        
-        # Parse credentials
-        creds_info = json.loads(creds_json)
-        
-        scopes = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
-        ]
-        
-        credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
-        self.gc = gspread.authorize(credentials)
-        
-        self.spreadsheet_id = spreadsheet_id
-        self.tests_sheet_id = tests_sheet_id  # If None, uses sheets in main spreadsheet
-        
-        # Pre-open spreadsheet and ensure sheets exist
-        self._init_sheets()
-        
-        logger.info("Google Sheets client initialized successfully")
-    
-    def _init_sheets(self):
-        """Initialize or get worksheets"""
-        spreadsheet = self.gc.open_by_key(self.spreadsheet_id)
-        
-        # Get or create Leads sheet
-        try:
-            self._leads_sheet = spreadsheet.worksheet(LEADS_SHEET_NAME)
-        except:
-            self._leads_sheet = spreadsheet.add_worksheet(title=LEADS_SHEET_NAME, rows=1000, cols=15)
-            # Add headers
-            self._leads_sheet.append_row([
-                'Дата', 'Источник', 'Имя', 'Роль', 'Компания', 
-                'Размер команды', 'Телефон', 'Telegram', 'User ID',
-                'Статус', 'Примечание'
-            ])
-            logger.info(f"Created sheet: {LEADS_SHEET_NAME}")
-        
-        # Get or create Tests sheet (same spreadsheet or different)
-        if self.tests_sheet_id:
-            # Different spreadsheet for tests
-            tests_spreadsheet = self.gc.open_by_key(self.tests_sheet_id)
-            try:
-                self._tests_sheet = tests_spreadsheet.worksheet(TESTS_SHEET_NAME)
-            except:
-                self._tests_sheet = tests_spreadsheet.sheet1
-        else:
-            # Same spreadsheet, different sheet
-            try:
-                self._tests_sheet = spreadsheet.worksheet(TESTS_SHEET_NAME)
-            except:
-                self._tests_sheet = spreadsheet.add_worksheet(title=TESTS_SHEET_NAME, rows=1000, cols=15)
-                # Add headers
-                self._tests_sheet.append_row([
-                    'Дата', 'Продукт', 'Имя', 'Роль', 'Компания',
-                    'Размер команды', 'Телефон', 'Telegram', 'User ID',
-                    'Типаж', 'Баллы'
-                ])
-                logger.info(f"Created sheet: {TESTS_SHEET_NAME}")
-    
-    def _get_leads_sheet(self):
-        """Get the leads worksheet"""
-        return self._leads_sheet
-    
-    def _get_tests_sheet(self):
-        """Get the tests worksheet"""
-        return self._tests_sheet
-    
-    def append_lead(self, lead: dict) -> bool:
-        """Append a single lead row to the sheet"""
-        try:
-            sheet = self._get_leads_sheet()
-            
-            row = [
-                lead.get('created_at', '')[:19] if lead.get('created_at') else '',
-                'webapp',  # source
-                lead.get('name', ''),
-                lead.get('role', ''),
-                lead.get('company', ''),
-                lead.get('team_size', ''),
-                lead.get('phone', ''),
-                lead.get('telegram_username', ''),
-                str(lead.get('user_id', '')),
-                lead.get('status', 'new'),
-                lead.get('notes', '')
-            ]
-            
-            sheet.append_row(row)
-            logger.info(f"Lead appended to Google Sheets: {lead.get('name')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to append lead to Google Sheets: {e}")
-            return False
-    
-    def append_test_result(self, test: dict, lead: Optional[dict] = None) -> bool:
-        """Append a single test result row to the sheet"""
-        try:
-            sheet = self._get_tests_sheet()
-            
-            # Parse scores if present
-            scores_str = ''
-            if test.get('scores'):
-                try:
-                    if isinstance(test['scores'], str):
-                        scores = json.loads(test['scores'])
-                    else:
-                        scores = test['scores']
-                    scores_str = ', '.join([f"{k}: {v}" for k, v in scores.items()])
-                except:
-                    scores_str = str(test.get('scores', ''))
-            
-            row = [
-                test.get('created_at', '')[:19] if test.get('created_at') else '',
-                test.get('product', 'teremok'),
-                lead.get('name', '') if lead else test.get('name', ''),
-                lead.get('role', '') if lead else test.get('role', ''),
-                lead.get('company', '') if lead else test.get('company', ''),
-                lead.get('team_size', '') if lead else test.get('team_size', ''),
-                lead.get('phone', '') if lead else test.get('phone', ''),
-                lead.get('telegram_username', '') if lead else test.get('telegram_username', ''),
-                str(test.get('user_id', '')),
-                test.get('result_type', ''),
-                scores_str
-            ]
-            
-            sheet.append_row(row)
-            logger.info(f"Test result appended to Google Sheets: {test.get('result_type')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to append test result to Google Sheets: {e}")
-            return False
-    
-    def full_export_leads(self, leads: List[dict]) -> bool:
-        """Export all leads to the sheet (clears existing data)"""
-        try:
-            sheet = self._get_leads_sheet()
-            
-            # Clear and add headers
-            sheet.clear()
-            headers = [
-                'Дата', 'Источник', 'Имя', 'Роль', 'Компания', 
-                'Размер команды', 'Телефон', 'Telegram', 'User ID',
-                'Статус', 'Примечание'
-            ]
-            sheet.append_row(headers)
-            
-            # Add all leads
-            for lead in leads:
-                row = [
-                    lead.get('created_at', '')[:19] if lead.get('created_at') else '',
-                    'webapp',
-                    lead.get('name', ''),
-                    lead.get('role', ''),
-                    lead.get('company', ''),
-                    lead.get('team_size', ''),
-                    lead.get('phone', ''),
-                    lead.get('telegram_username', ''),
-                    str(lead.get('user_id', '')),
-                    lead.get('status', 'new'),
-                    lead.get('notes', '')
-                ]
-                sheet.append_row(row)
-            
-            logger.info(f"Full leads export completed: {len(leads)} leads")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Full leads export failed: {e}")
-            return False
-    
-    def full_export_tests(self, tests: List[dict]) -> bool:
-        """Export all test results to the sheet (clears existing data)"""
-        try:
-            sheet = self._get_tests_sheet()
-            
-            # Clear and add headers
-            sheet.clear()
-            headers = [
-                'Дата', 'Продукт', 'Имя', 'Роль', 'Компания',
-                'Размер команды', 'Телефон', 'Telegram', 'User ID',
-                'Типаж', 'Баллы'
-            ]
-            sheet.append_row(headers)
-            
-            # Add all tests
-            for test in tests:
-                scores_str = ''
-                if test.get('scores') or test.get('test_scores'):
-                    try:
-                        scores = test.get('scores') or test.get('test_scores')
-                        if isinstance(scores, str):
-                            scores = json.loads(scores)
-                        scores_str = ', '.join([f"{k}: {v}" for k, v in scores.items()])
-                    except:
-                        scores_str = str(test.get('scores', ''))
-                
-                row = [
-                    test.get('created_at', '')[:19] if test.get('created_at') else '',
-                    test.get('product', 'teremok'),
-                    test.get('name', ''),
-                    test.get('role', ''),
-                    test.get('company', ''),
-                    test.get('team_size', ''),
-                    test.get('phone', ''),
-                    test.get('telegram_username', ''),
-                    str(test.get('user_id', '')),
-                    test.get('result_type', ''),
-                    scores_str
-                ]
-                sheet.append_row(row)
-            
-            logger.info(f"Full tests export completed: {len(tests)} tests")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Full tests export failed: {e}")
-            return False
-
-
-def get_sheets_client() -> Optional[GoogleSheetsClient]:
-    """Get or create the Google Sheets client singleton"""
-    global _sheets_client
-    
-    if not settings.GOOGLE_SHEETS_ENABLED:
-        return None
-    
-    if _sheets_client is not None:
-        return _sheets_client
-    
-    if not settings.GOOGLE_SERVICE_ACCOUNT_JSON:
-        logger.warning("GOOGLE_SERVICE_ACCOUNT_JSON not configured")
-        return None
-    
-    if not settings.GOOGLE_SHEETS_LEADS_ID:
-        logger.warning("GOOGLE_SHEETS_LEADS_ID not configured")
-        return None
+    if not webhook_url:
+        return False
     
     try:
-        # Use single spreadsheet mode if TESTS_ID is empty or same as LEADS_ID
-        tests_id = settings.GOOGLE_SHEETS_TESTS_ID
-        if not tests_id or tests_id == settings.GOOGLE_SHEETS_LEADS_ID:
-            tests_id = None  # Single spreadsheet mode
-        
-        _sheets_client = GoogleSheetsClient(
-            creds_json=settings.GOOGLE_SERVICE_ACCOUNT_JSON,
-            spreadsheet_id=settings.GOOGLE_SHEETS_LEADS_ID,
-            tests_sheet_id=tests_id
-        )
-        return _sheets_client
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                webhook_url,
+                json=data,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Sent to Google Sheets: {data.get('type')}")
+                return True
+            else:
+                logger.error(f"Google Sheets webhook error: {response.status_code}")
+                return False
+                
     except Exception as e:
-        logger.error(f"Failed to initialize Google Sheets client: {e}")
-        return None
+        logger.error(f"Google Sheets webhook failed: {e}")
+        return False
 
 
 async def export_lead_to_sheets(lead: dict) -> bool:
-    """Helper function to export a single lead"""
-    client = get_sheets_client()
-    if client:
-        return client.append_lead(lead)
-    return False
+    """Export a lead to Google Sheets"""
+    if not settings.GOOGLE_SHEETS_ENABLED:
+        return False
+    
+    data = {
+        "type": "lead",
+        "name": lead.get("name", ""),
+        "role": lead.get("role", ""),
+        "company": lead.get("company", ""),
+        "phone": lead.get("phone", ""),
+        "telegram": lead.get("telegram_username", ""),
+        "team_size": lead.get("team_size", ""),
+        "user_id": str(lead.get("user_id", "")),
+        "status": lead.get("status", "new")
+    }
+    
+    return await send_to_sheets(data)
 
 
 async def export_test_to_sheets(test: dict, lead: Optional[dict] = None) -> bool:
-    """Helper function to export a single test result"""
-    client = get_sheets_client()
-    if client:
-        return client.append_test_result(test, lead)
-    return False
+    """Export a test result to Google Sheets"""
+    if not settings.GOOGLE_SHEETS_ENABLED:
+        return False
+    
+    # Parse scores
+    scores_str = ""
+    if test.get("scores"):
+        try:
+            scores = test["scores"]
+            if isinstance(scores, str):
+                scores = json.loads(scores)
+            scores_str = ", ".join([f"{k}: {v}" for k, v in scores.items()])
+        except:
+            scores_str = str(test.get("scores", ""))
+    
+    data = {
+        "type": "test",
+        "name": lead.get("name", "") if lead else test.get("name", ""),
+        "role": lead.get("role", "") if lead else test.get("role", ""),
+        "company": lead.get("company", "") if lead else test.get("company", ""),
+        "phone": lead.get("phone", "") if lead else test.get("phone", ""),
+        "result_type": test.get("result_type", ""),
+        "scores": scores_str,
+        "product": test.get("product", "teremok"),
+        "user_id": str(test.get("user_id", ""))
+    }
+    
+    return await send_to_sheets(data)
+
+
+# Legacy compatibility - these do nothing now, export happens via webhook
+def get_sheets_client():
+    return None
+
+
+class GoogleSheetsClient:
+    def full_export_leads(self, leads): pass
+    def full_export_tests(self, tests): pass
