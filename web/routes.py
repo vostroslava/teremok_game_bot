@@ -561,6 +561,26 @@ async def formula_info_page(request: Request):
     return templates.TemplateResponse("formula/rsp_test.html", {"request": request})
 
 
+
+
+@app.get("/app/formula/overview", response_class=HTMLResponse)
+async def formula_overview_page(request: Request):
+    return templates.TemplateResponse("formula/overview.html", {"request": request})
+
+@app.get("/app/formula")
+async def formula_root_redirect(request: Request):
+    return RedirectResponse(url="/app/formula/overview")
+
+
+
+@app.get("/app/formula/types", response_class=HTMLResponse)
+async def formula_types_page(request: Request):
+    return templates.TemplateResponse("formula/types.html", {"request": request})
+
+@app.get("/app/formula/situations", response_class=HTMLResponse)
+async def formula_situations_page(request: Request):
+    return templates.TemplateResponse("formula/situations.html", {"request": request})
+
 @app.get("/app/formula/result/{test_id}")
 async def formula_result_page(request: Request, test_id: int):
     try:

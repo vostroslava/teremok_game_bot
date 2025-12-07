@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта типажей R/S/P</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1a0b2e 0%, #4a148c 50%, #311b92 100%);
+            --card-bg: rgba(255, 255, 255, 0.08);
+            --text: #f0f0f5;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --accent: #7c4dff;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text);
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .type-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .emoji {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .desc {
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #fff;
+            margin-bottom: 8px;
+            opacity: 0.8;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .list {
+            padding-left: 20px;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="/app/formula/overview" class="back-btn">← Назад</a>
+
+    <div class="header">
+        <h1>Карта типажей</h1>
+    </div>
+
+    <!-- Result -->
+    <div class="type-card">
+        <div class="emoji">🎯</div>
+        <div class="title">Результатник</div>
+        <p class="desc">Человек цели. Его мотивирует достижение конкретных показателей, победа, цифры и бонусы за
+            результат.</p>
+
+        <div class="section-title">Как узнать?</div>
+        <div class="tags">
+            <span class="tag">Говорит цифрами</span>
+            <span class="tag">Не любит оправдания</span>
+            <span class="tag">Быстро принимает решения</span>
+        </div>
+
+        <div class="section-title">Риски</div>
+        <ul class="list">
+            <li>Может "перегореть" на работе</li>
+            <li>Игнроирует правила ради цели</li>
+            <li>Конфликтует с медлительными коллегами</li>
+        </ul>
+    </div>
+
+    <!-- Status -->
+    <div class="type-card">
+        <div class="emoji">👑</div>
+        <div class="title">Статусник</div>
+        <p class="desc">Человек влияния. Ему важны признание, авторитет, должность, атрибуты власти и уважение
+            окружающих.</p>
+
+        <div class="section-title">Как узнать?</div>
+        <div class="tags">
+            <span class="tag">Важна иерархия</span>
+            <span class="tag">Любит публичность</span>
+            <span class="tag">Болезненно реагирует на критику</span>
+        </div>
+
+        <div class="section-title">Риски</div>
+        <ul class="list">
+            <li>Интриги и политика</li>
+            <li>Защита статуса в ущерб делу</li>
+            <li>Требует особого отношения</li>
+        </ul>
+    </div>
+
+    <!-- Process -->
+    <div class="type-card">
+        <div class="emoji">⚙️</div>
+        <div class="title">Процессник</div>
+        <p class="desc">Человек порядка. Ценит стабильность, правила, инструкции и качество исполнения работы.</p>
+
+        <div class="section-title">Как узнать?</div>
+        <div class="tags">
+            <span class="tag">Любит регламенты</span>
+            <span class="tag">Задает много уточняющих вопросов</span>
+            <span class="tag">Не любит хаос и спешку</span>
+        </div>
+
+        <div class="section-title">Риски</div>
+        <ul class="list">
+            <li>Застревает в деталях</li>
+            <li>Сопротивляется переменам</li>
+            <li>Бюрократизация процессов</li>
+        </ul>
+    </div>
+
+    <script>
+        window.Telegram?.WebApp?.ready();
+    </script>
+</body>
+
+</html>
