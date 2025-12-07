@@ -1,109 +1,75 @@
 # Google Sheets Integration
 
-## Быстрый старт
+## Быстрый старт (одна таблица, 2 листа)
 
-### 1. Создайте Google таблицы
+### 1. Создайте Google таблицу
 
-Создайте 2 таблицы в Google Sheets:
+Создайте **одну** таблицу: `Teremok CRM`
 
-**Таблица лидов** — назовите: `Teremok Leads`
-**Таблица тестов** — назовите: `Teremok Tests`
+Бот автоматически создаст в ней 2 листа:
+- **Лиды** — контакты
+- **Тесты** — результаты тестов
 
-Скопируйте ID каждой таблицы из URL:
+Скопируйте ID таблицы из URL:
 ```
 https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit
-                                       ^^^^^^^^^^^^^^^^
 ```
 
 ---
 
-### 2. Создайте сервисный аккаунт Google
+### 2. Создайте сервисный аккаунт
 
 1. Откройте [Google Cloud Console](https://console.cloud.google.com/)
-2. Создайте проект (или выберите существующий)
-3. Перейдите в **APIs & Services** → **Enable APIs**
-4. Включите **Google Sheets API** и **Google Drive API**
-5. Перейдите в **IAM & Admin** → **Service Accounts**
-6. Нажмите **Create Service Account**
-   - Имя: `teremok-sheets`
-   - Роль: не нужна
-7. Откройте созданный аккаунт → вкладка **Keys**
-8. **Add Key** → **Create new key** → **JSON**
-9. Скачайте JSON-файл
+2. Создайте проект → включите **Google Sheets API** и **Google Drive API**
+3. **IAM & Admin** → **Service Accounts** → **Create**
+4. Откройте аккаунт → **Keys** → **Add Key** → **JSON**
+5. Скачайте JSON-файл
 
 ---
 
-### 3. Дайте доступ к таблицам
+### 3. Дайте доступ к таблице
 
-Откройте **каждую** созданную таблицу и:
-1. Нажмите **Поделиться** (Share)
-2. Добавьте email сервисного аккаунта (из JSON: `"client_email": "..."`)
-3. Дайте права **Редактор** (Editor)
+1. Откройте созданную таблицу
+2. **Поделиться** → добавьте email из JSON (`client_email`)
+3. Права: **Редактор**
 
 ---
 
 ### 4. Настройте .env
 
 ```bash
-# Включите интеграцию
 GOOGLE_SHEETS_ENABLED=true
-
-# Вставьте JSON как одну строку (без переносов!)
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"teremok-sheets@your-project.iam.gserviceaccount.com",...}'
-
-# ID таблиц
+GOOGLE_SERVICE_ACCOUNT_JSON='<JSON одной строкой>'
 GOOGLE_SHEETS_LEADS_ID=1AbCdEfGhIjKlMnOpQrStUvWxYz
-GOOGLE_SHEETS_TESTS_ID=1ZyXwVuTsRqPoNmLkJiHgFeDcBa
 ```
+
+> **Примечание:** `GOOGLE_SHEETS_TESTS_ID` не нужен — оба листа создаются в одной таблице.
 
 ---
 
-### 5. Установите зависимости
+### 5. Перезапустите
 
 ```bash
 pip install gspread google-auth
+python main.py
 ```
 
 ---
 
-### 6. Перезапустите приложение
+## Структура листов
 
-```bash
-lsof -ti:8000 | xargs kill -9; python main.py
-```
-
----
-
-## Структура таблиц
-
-### Лиды (автоматически создаётся при экспорте)
+**Лиды:**
 | Дата | Источник | Имя | Роль | Компания | Размер команды | Телефон | Telegram | User ID | Статус | Примечание |
 
-### Тесты
+**Тесты:**
 | Дата | Продукт | Имя | Роль | Компания | Размер команды | Телефон | Telegram | User ID | Типаж | Баллы |
-
----
-
-## Использование
-
-### Автоматический экспорт
-При включенной интеграции каждый новый лид и результат теста автоматически добавляется в таблицы.
-
-### Ручной экспорт
-В админке (`/app/admin/leads` и `/app/admin/tests`) есть кнопка **Экспорт в Sheets**.
-Она очищает таблицу и загружает все данные заново.
 
 ---
 
 ## Troubleshooting
 
-**Ошибка: `gspread not installed`**
-```bash
-pip install gspread google-auth
-```
-
-**Ошибка: `Permission denied`**
-- Проверьте, что email сервисного аккаунта добавлен в таблицу как редактор
-
-**Ошибка: `Spreadsheet not found`**
-- Проверьте правильность ID таблицы в .env
+| Ошибка | Решение |
+|--------|---------|
+| `gspread not installed` | `pip install gspread google-auth` |
+| `Permission denied` | Добавьте email сервисного аккаунта в таблицу |
+| `Spreadsheet not found` | Проверьте ID таблицы в .env |

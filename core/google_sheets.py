@@ -1,6 +1,7 @@
 """
 Google Sheets Integration Module
 Exports leads and test results to Google Sheets
+Supports both: 1 spreadsheet with 2 sheets OR 2 separate spreadsheets
 """
 import json
 import logging
@@ -12,10 +13,23 @@ logger = logging.getLogger(__name__)
 # Singleton client instance
 _sheets_client = None
 
+# Sheet names for single-spreadsheet mode
+LEADS_SHEET_NAME = "Лиды"
+TESTS_SHEET_NAME = "Тесты"
+
+
 class GoogleSheetsClient:
     """Client for Google Sheets API operations"""
     
-    def __init__(self, creds_json: str, leads_sheet_id: str, tests_sheet_id: str):
+    def __init__(self, creds_json: str, spreadsheet_id: str, tests_sheet_id: str = None):
+        """
+        Initialize client.
+        
+        Args:
+            creds_json: Service account JSON credentials
+            spreadsheet_id: Main spreadsheet ID (contains both sheets if tests_sheet_id is None)
+            tests_sheet_id: Optional separate spreadsheet for tests (if None, uses sheets in main spreadsheet)
+        """
         try:
             import gspread
             from google.oauth2.service_account import Credentials
@@ -34,20 +48,60 @@ class GoogleSheetsClient:
         credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
         self.gc = gspread.authorize(credentials)
         
-        self.leads_sheet_id = leads_sheet_id
-        self.tests_sheet_id = tests_sheet_id
+        self.spreadsheet_id = spreadsheet_id
+        self.tests_sheet_id = tests_sheet_id  # If None, uses sheets in main spreadsheet
+        
+        # Pre-open spreadsheet and ensure sheets exist
+        self._init_sheets()
         
         logger.info("Google Sheets client initialized successfully")
     
+    def _init_sheets(self):
+        """Initialize or get worksheets"""
+        spreadsheet = self.gc.open_by_key(self.spreadsheet_id)
+        
+        # Get or create Leads sheet
+        try:
+            self._leads_sheet = spreadsheet.worksheet(LEADS_SHEET_NAME)
+        except:
+            self._leads_sheet = spreadsheet.add_worksheet(title=LEADS_SHEET_NAME, rows=1000, cols=15)
+            # Add headers
+            self._leads_sheet.append_row([
+                'Дата', 'Источник', 'Имя', 'Роль', 'Компания', 
+                'Размер команды', 'Телефон', 'Telegram', 'User ID',
+                'Статус', 'Примечание'
+            ])
+            logger.info(f"Created sheet: {LEADS_SHEET_NAME}")
+        
+        # Get or create Tests sheet (same spreadsheet or different)
+        if self.tests_sheet_id:
+            # Different spreadsheet for tests
+            tests_spreadsheet = self.gc.open_by_key(self.tests_sheet_id)
+            try:
+                self._tests_sheet = tests_spreadsheet.worksheet(TESTS_SHEET_NAME)
+            except:
+                self._tests_sheet = tests_spreadsheet.sheet1
+        else:
+            # Same spreadsheet, different sheet
+            try:
+                self._tests_sheet = spreadsheet.worksheet(TESTS_SHEET_NAME)
+            except:
+                self._tests_sheet = spreadsheet.add_worksheet(title=TESTS_SHEET_NAME, rows=1000, cols=15)
+                # Add headers
+                self._tests_sheet.append_row([
+                    'Дата', 'Продукт', 'Имя', 'Роль', 'Компания',
+                    'Размер команды', 'Телефон', 'Telegram', 'User ID',
+                    'Типаж', 'Баллы'
+                ])
+                logger.info(f"Created sheet: {TESTS_SHEET_NAME}")
+    
     def _get_leads_sheet(self):
         """Get the leads worksheet"""
-        spreadsheet = self.gc.open_by_key(self.leads_sheet_id)
-        return spreadsheet.sheet1
+        return self._leads_sheet
     
     def _get_tests_sheet(self):
         """Get the tests worksheet"""
-        spreadsheet = self.gc.open_by_key(self.tests_sheet_id)
-        return spreadsheet.sheet1
+        return self._tests_sheet
     
     def append_lead(self, lead: dict) -> bool:
         """Append a single lead row to the sheet"""
@@ -216,15 +270,20 @@ def get_sheets_client() -> Optional[GoogleSheetsClient]:
         logger.warning("GOOGLE_SERVICE_ACCOUNT_JSON not configured")
         return None
     
-    if not settings.GOOGLE_SHEETS_LEADS_ID or not settings.GOOGLE_SHEETS_TESTS_ID:
-        logger.warning("Google Sheets IDs not configured")
+    if not settings.GOOGLE_SHEETS_LEADS_ID:
+        logger.warning("GOOGLE_SHEETS_LEADS_ID not configured")
         return None
     
     try:
+        # Use single spreadsheet mode if TESTS_ID is empty or same as LEADS_ID
+        tests_id = settings.GOOGLE_SHEETS_TESTS_ID
+        if not tests_id or tests_id == settings.GOOGLE_SHEETS_LEADS_ID:
+            tests_id = None  # Single spreadsheet mode
+        
         _sheets_client = GoogleSheetsClient(
             creds_json=settings.GOOGLE_SERVICE_ACCOUNT_JSON,
-            leads_sheet_id=settings.GOOGLE_SHEETS_LEADS_ID,
-            tests_sheet_id=settings.GOOGLE_SHEETS_TESTS_ID
+            spreadsheet_id=settings.GOOGLE_SHEETS_LEADS_ID,
+            tests_sheet_id=tests_id
         )
         return _sheets_client
     except Exception as e:
