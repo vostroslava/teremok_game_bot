@@ -472,7 +472,26 @@ async def submit_formula_results(request: Request):
         answers = data.get('answers') # List of scores
         
         if not user_id or not answers:
-            return JSONResponse({"status": "error", "message": "Missing required fields"}, status_code=400)
+            # If user_id is missing (e.g. web test), generate a random one or use 0 but handle FK
+            # For now, if 0, let's treat as anonymous
+            if not user_id: 
+                 import random
+                 user_id = random.randint(1000000, 9999999)
+        
+        # Ensure user exists in contacts to satisfy FK
+        # We don't have manager info here, so we create a placeholder
+        from core.database import has_contact, save_contact
+        if not await has_contact(user_id):
+            await save_contact(
+                user_id=user_id,
+                name="Web User",
+                role="Guest",
+                company="",
+                team_size="",
+                phone="",
+                telegram_username=None,
+                product="formula"
+            )
 
         # Calculate result
         from core.formula_logic import compute_formula_level
