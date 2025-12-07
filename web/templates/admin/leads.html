@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лиды | Админ-панель</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 32px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-item {
+            display: block;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-light);
+        }
+
+        .main {
+            margin-left: 240px;
+            padding: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-input,
+        .filter-select {
+            padding: 10px 14px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .filter-input:focus,
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-light);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent-light);
+        }
+
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        td {
+            font-size: 0.875rem;
+        }
+
+        tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .badge-new {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+        }
+
+        .badge-in_progress {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-done {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent-light);
+        }
+
+        .badge-spam {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .count {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+
+            .filter-input,
+            .filter-select,
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">🏠 Теремок Админ</div>
+        <nav>
+            <a href="/app/admin?key={{ key }}" class="nav-item">📊 Дашборд</a>
+            <a href="/app/admin/leads?key={{ key }}" class="nav-item active">👥 Лиды</a>
+            <a href="/app/admin/tests?key={{ key }}" class="nav-item">🧩 Тесты</a>
+            <a href="/app/admin/settings?key={{ key }}" class="nav-item">⚙️ Настройки</a>
+            <a href="/app/hub" class="nav-item">← Назад в хаб</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <h1 class="page-title">👥 Лиды</h1>
+            <span class="count">Всего: {{ leads|length }}</span>
+        </div>
+
+        <div class="filters">
+            <form method="get" action="/app/admin/leads" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <input type="hidden" name="key" value="{{ key }}">
+
+                <input type="text" name="search" class="filter-input" placeholder="🔍 Поиск..."
+                    value="{{ current_search or '' }}">
+
+                <select name="status" class="filter-select">
+                    <option value="all" {% if current_status=='all' %}selected{% endif %}>Все статусы</option>
+                    <option value="new" {% if current_status=='new' %}selected{% endif %}>🟢 Новые</option>
+                    <option value="in_progress" {% if current_status=='in_progress' %}selected{% endif %}>🟡 В работе
+                    </option>
+                    <option value="done" {% if current_status=='done' %}selected{% endif %}>🔵 Закрыто</option>
+                    <option value="spam" {% if current_status=='spam' %}selected{% endif %}>🔴 Спам</option>
+                </select>
+
+                <select name="days" class="filter-select">
+                    <option value="">Все время</option>
+                    <option value="1" {% if current_days==1 %}selected{% endif %}>Сегодня</option>
+                    <option value="7" {% if current_days==7 %}selected{% endif %}>7 дней</option>
+                    <option value="30" {% if current_days==30 %}selected{% endif %}>30 дней</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">Применить</button>
+            </form>
+
+            <button class="btn btn-outline" onclick="exportToSheets()">📤 Экспорт в Sheets</button>
+        </div>
+
+        <div class="section">
+            {% if leads %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Имя</th>
+                        <th>Роль</th>
+                        <th>Компания</th>
+                        <th>Команда</th>
+                        <th>Телефон</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads %}
+                    <tr>
+                        <td>{{ lead.created_at[:10] if lead.created_at else '-' }}</td>
+                        <td>{{ lead.name }}</td>
+                        <td>{{ lead.role or '-' }}</td>
+                        <td>{{ lead.company or '-' }}</td>
+                        <td>{{ lead.team_size or '-' }}</td>
+                        <td>{{ lead.phone }}</td>
+                        <td>
+                            <span class="badge badge-{{ lead.status or 'new' }}"
+                                onclick="openModal({{ lead.user_id }}, '{{ lead.name }}', '{{ lead.status or 'new' }}', '{{ lead.notes or '' }}')">
+                                {{ lead.status or 'new' }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline"
+                                onclick="openModal({{ lead.user_id }}, '{{ lead.name }}', '{{ lead.status or 'new' }}', '{{ lead.notes or '' }}')">✏️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">Лидов не найдено</div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h3 class="modal-title">✏️ Редактирование лида</h3>
+            <p id="leadName" style="color: var(--text-muted); margin-bottom: 16px;"></p>
+
+            <div class="form-group">
+                <label class="form-label">Статус</label>
+                <select id="leadStatus" class="form-select">
+                    <option value="new">🟢 Новый</option>
+                    <option value="in_progress">🟡 В работе</option>
+                    <option value="done">🔵 Закрыто</option>
+                    <option value="spam">🔴 Спам</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Примечание</label>
+                <textarea id="leadNotes" class="form-textarea" placeholder="Комментарий..."></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveChanges()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">✓ Сохранено</div>
+
+    <script>
+        let currentUserId = null;
+
+        function openModal(userId, name, status, notes) {
+            currentUserId = userId;
+            document.getElementById('leadName').textContent = name;
+            document.getElementById('leadStatus').value = status;
+            document.getElementById('leadNotes').value = notes;
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('active');
+            currentUserId = null;
+        }
+
+        async function saveChanges() {
+            const status = document.getElementById('leadStatus').value;
+            const notes = document.getElementById('leadNotes').value;
+
+            const res = await fetch(`/app/admin/api/lead/${currentUserId}/status?key={{ key }}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, notes })
+            });
+
+            if (res.ok) {
+                showToast('✓ Сохранено');
+                closeModal();
+                setTimeout(() => location.reload(), 500);
+            } else {
+                showToast('❌ Ошибка');
+            }
+        }
+
+        async function exportToSheets() {
+            showToast('⏳ Экспорт...');
+            const res = await fetch('/app/admin/api/export/leads?key={{ key }}', { method: 'POST' });
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast(`✓ Экспортировано: ${data.count} записей`);
+            } else {
+                showToast('❌ ' + (data.error || 'Ошибка экспорта'));
+            }
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        // Close modal on outside click
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if (e.target.id === 'editModal') closeModal();
+        });
+    </script>
+</body>
+
+</html>

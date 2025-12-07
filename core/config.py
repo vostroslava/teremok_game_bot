@@ -25,5 +25,14 @@ class Settings:
     # Channel subscription check
     REQUIRED_CHANNEL_USERNAME: str = os.getenv("REQUIRED_CHANNEL_USERNAME", "testtesttest12332221")
     CHECK_SUBSCRIPTION_ENABLED: bool = os.getenv("CHECK_SUBSCRIPTION_ENABLED", "true").lower() == "true"
+    
+    # Admin Panel
+    ADMIN_PANEL_SECRET: str = os.getenv("ADMIN_PANEL_SECRET", "")
+    
+    # Google Sheets Integration
+    GOOGLE_SHEETS_ENABLED: bool = os.getenv("GOOGLE_SHEETS_ENABLED", "false").lower() == "true"
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    GOOGLE_SHEETS_LEADS_ID: str = os.getenv("GOOGLE_SHEETS_LEADS_ID", "")
+    GOOGLE_SHEETS_TESTS_ID: str = os.getenv("GOOGLE_SHEETS_TESTS_ID", "")
 
 settings = Settings()

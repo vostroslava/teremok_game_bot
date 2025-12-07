@@ -387,6 +387,10 @@ async def app_channel(request: Request):
 # Mount specific routes first
 app.include_router(router)
 
+# Include admin routes
+from web.admin_routes import router as admin_router
+app.include_router(admin_router)
+
 # Serve static files
 # We need to get absolute path to avoid issues
 static_path = os.path.join(os.path.dirname(__file__), "static")
@@ -398,4 +402,5 @@ from fastapi.responses import RedirectResponse
 async def read_root():
     """Redirect root to main hub"""
     return RedirectResponse(url="/app/hub")
+
 

@@ -45,13 +45,32 @@ async def cmd_admin(message: Message):
     leads_count = await get_leads_count()
     tests_count = await get_tests_count()
     
+    # Build admin panel URL
+    admin_url = ""
+    if settings.ADMIN_PANEL_SECRET and settings.WEB_APP_URL:
+        base_url = settings.WEB_APP_URL.rstrip('/')
+        admin_url = f"{base_url}/app/admin?key={settings.ADMIN_PANEL_SECRET}"
+    
     text = (
         f"🔐 <b>Админ-панель</b>\n\n"
         f"Ваша роль: {role}\n\n"
-        f"📊 <b>Статистика:</b>\n"
-        f"• Заявок (контактов): {leads_count}\n"
-        f"• Пройденных тестов: {tests_count}\n\n"
-        f"<b>Команды:</b>\n"
+        f"📊 <b>Быстрая сводка:</b>\n"
+        f"• Заявок: {leads_count}\n"
+        f"• Тестов: {tests_count}\n"
+    )
+    
+    if admin_url:
+        text += (
+            f"\n🌐 <b>Веб-админка:</b>\n"
+            f"<a href=\"{admin_url}\">Открыть панель управления</a>\n\n"
+            f"Там вы найдёте:\n"
+            f"• Детальную статистику\n"
+            f"• Управление лидами (статусы, заметки)\n"
+            f"• Экспорт в Google Sheets\n"
+        )
+    
+    text += (
+        f"\n<b>Быстрые команды:</b>\n"
         f"/leads — Последние заявки\n"
         f"/stats — Подробная статистика\n"
     )
@@ -64,50 +83,57 @@ async def cmd_admin(message: Message):
             f"/admins — Список админов\n"
         )
     
-    await message.answer(text, parse_mode="HTML")
+    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.message(Command("leads"))
 async def cmd_leads(message: Message):
-    """View recent leads"""
+    """View recent leads with quick stats"""
     user_id = message.from_user.id
     
     if not is_owner(user_id) and not await is_admin(user_id):
         await message.answer("❌ У вас нет доступа.")
         return
     
-    leads = await get_all_leads(limit=10)
+    # Get stats
+    from core.database import get_stats
+    stats = await get_stats()
     
-    if not leads:
-        await message.answer("📭 Заявок пока нет.")
-        return
+    leads = await get_all_leads(limit=5)
     
-    text = "📋 <b>Последние заявки:</b>\n\n"
+    text = (
+        f"📋 <b>Сводка по лидам</b>\n\n"
+        f"📊 <b>Статистика:</b>\n"
+        f"• Сегодня: <b>{stats.get('leads_today', 0)}</b> лидов, <b>{stats.get('tests_today', 0)}</b> тестов\n"
+        f"• За 7 дней: <b>{stats.get('leads_7d', 0)}</b> лидов, <b>{stats.get('tests_7d', 0)}</b> тестов\n"
+        f"• Всего: <b>{stats.get('total_leads', 0)}</b> лидов, <b>{stats.get('total_tests', 0)}</b> тестов\n"
+    )
     
-    for i, lead in enumerate(leads, 1):
-        type_emoji = ""
-        if lead.get('result_type'):
-            type_info = TYPES_DATA.get(lead['result_type'])
-            type_emoji = f" {type_info.emoji}" if type_info else ""
-        
-        text += (
-            f"<b>{i}. {lead.get('name', 'Н/Д')}</b>{type_emoji}\n"
-            f"   📞 {lead.get('phone', '-')}\n"
-            f"   💼 {lead.get('role', '-')} @ {lead.get('company', '-')}\n"
-            f"   👥 {lead.get('team_size', '-')}\n"
-        )
-        
-        if lead.get('telegram_username'):
-            text += f"   💬 @{lead['telegram_username']}\n"
-        
-        if lead.get('result_type'):
-            type_info = TYPES_DATA.get(lead['result_type'])
-            type_name = type_info.name_ru if type_info else lead['result_type']
-            text += f"   🧾 Тест: {type_name}\n"
-        
-        text += "\n"
+    if leads:
+        text += "\n📥 <b>Последние 5 заявок:</b>\n\n"
+        for i, lead in enumerate(leads, 1):
+            type_emoji = ""
+            if lead.get('result_type'):
+                type_info = TYPES_DATA.get(lead['result_type'])
+                type_emoji = f" {type_info.emoji}" if type_info else ""
+            
+            status = lead.get('status', 'new')
+            status_emoji = {'new': '🟢', 'in_progress': '🟡', 'done': '🔵', 'spam': '🔴'}.get(status, '⚪')
+            
+            text += (
+                f"<b>{i}. {lead.get('name', 'Н/Д')}</b>{type_emoji} {status_emoji}\n"
+                f"   📞 {lead.get('phone', '-')} | 💼 {lead.get('company', '-')}\n"
+            )
+    else:
+        text += "\n📭 Заявок пока нет."
     
-    await message.answer(text, parse_mode="HTML")
+    # Add web admin link
+    if settings.ADMIN_PANEL_SECRET and settings.WEB_APP_URL:
+        base_url = settings.WEB_APP_URL.rstrip('/')
+        admin_url = f"{base_url}/app/admin/leads?key={settings.ADMIN_PANEL_SECRET}"
+        text += f"\n\n🔗 <a href=\"{admin_url}\">Подробнее в веб-админке</a>"
+    
+    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.message(Command("stats"))

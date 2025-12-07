@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тесты | Админ-панель</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 32px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-item {
+            display: block;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-light);
+        }
+
+        .main {
+            margin-left: 240px;
+            padding: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-select {
+            padding: 10px 14px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent-light);
+        }
+
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        td {
+            font-size: 0.875rem;
+        }
+
+        tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .count {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .scores {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">🏠 Теремок Админ</div>
+        <nav>
+            <a href="/app/admin?key={{ key }}" class="nav-item">📊 Дашборд</a>
+            <a href="/app/admin/leads?key={{ key }}" class="nav-item">👥 Лиды</a>
+            <a href="/app/admin/tests?key={{ key }}" class="nav-item active">🧩 Тесты</a>
+            <a href="/app/admin/settings?key={{ key }}" class="nav-item">⚙️ Настройки</a>
+            <a href="/app/hub" class="nav-item">← Назад в хаб</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <h1 class="page-title">🧩 Результаты тестов</h1>
+            <span class="count">Всего: {{ tests|length }}</span>
+        </div>
+
+        <div class="filters">
+            <form method="get" action="/app/admin/tests" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <input type="hidden" name="key" value="{{ key }}">
+
+                <select name="product" class="filter-select">
+                    <option value="all" {% if current_product=='all' %}selected{% endif %}>Все продукты</option>
+                    <option value="teremok" {% if current_product=='teremok' %}selected{% endif %}>🏠 Теремок</option>
+                    <option value="formula" {% if current_product=='formula' %}selected{% endif %}>📐 Формула</option>
+                </select>
+
+                <select name="result_type" class="filter-select">
+                    <option value="all" {% if current_type=='all' %}selected{% endif %}>Все типажи</option>
+                    {% for type in all_types %}
+                    <option value="{{ type.id }}" {% if current_type==type.id %}selected{% endif %}>
+                        {{ type.emoji }} {{ type.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <select name="days" class="filter-select">
+                    <option value="">Все время</option>
+                    <option value="1" {% if current_days==1 %}selected{% endif %}>Сегодня</option>
+                    <option value="7" {% if current_days==7 %}selected{% endif %}>7 дней</option>
+                    <option value="30" {% if current_days==30 %}selected{% endif %}>30 дней</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">Применить</button>
+            </form>
+
+            <button class="btn btn-outline" onclick="exportToSheets()">📤 Экспорт в Sheets</button>
+        </div>
+
+        <div class="section">
+            {% if tests %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Имя</th>
+                        <th>Роль</th>
+                        <th>Компания</th>
+                        <th>Типаж</th>
+                        <th>Продукт</th>
+                        <th>Баллы</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for test in tests %}
+                    <tr>
+                        <td>{{ test.created_at[:10] if test.created_at else '-' }}</td>
+                        <td>{{ test.name or 'Аноним' }}</td>
+                        <td>{{ test.role or '-' }}</td>
+                        <td>{{ test.company or '-' }}</td>
+                        <td>
+                            <span class="type-badge">
+                                {{ test.type_emoji or '❓' }} {{ test.type_name or test.result_type }}
+                            </span>
+                        </td>
+                        <td>{{ test.product }}</td>
+                        <td class="scores">{{ test.scores or test.test_scores or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">Тестов не найдено</div>
+            {% endif %}
+        </div>
+    </main>
+
+    <div class="toast" id="toast">✓ Экспортировано</div>
+
+    <script>
+        async function exportToSheets() {
+            showToast('⏳ Экспорт...');
+            const res = await fetch('/app/admin/api/export/tests?key={{ key }}', { method: 'POST' });
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast(`✓ Экспортировано: ${data.count} записей`);
+            } else {
+                showToast('❌ ' + (data.error || 'Ошибка экспорта'));
+            }
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки | Админ-панель</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 32px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-item {
+            display: block;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-light);
+        }
+
+        .main {
+            margin-left: 240px;
+            padding: 24px;
+        }
+
+        .header {
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .config-value {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .config-value.enabled {
+            color: var(--success);
+        }
+
+        .config-value.disabled {
+            color: var(--text-muted);
+        }
+
+        .note {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">🏠 Теремок Админ</div>
+        <nav>
+            <a href="/app/admin?key={{ key }}" class="nav-item">📊 Дашборд</a>
+            <a href="/app/admin/leads?key={{ key }}" class="nav-item">👥 Лиды</a>
+            <a href="/app/admin/tests?key={{ key }}" class="nav-item">🧩 Тесты</a>
+            <a href="/app/admin/settings?key={{ key }}" class="nav-item active">⚙️ Настройки</a>
+            <a href="/app/hub" class="nav-item">← Назад в хаб</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <h1 class="page-title">⚙️ Настройки</h1>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Telegram</h2>
+
+            <div class="config-item">
+                <span class="config-label">Канал для подписки</span>
+                <span class="config-value">@{{ config.REQUIRED_CHANNEL_USERNAME }}</span>
+            </div>
+
+            <div class="config-item">
+                <span class="config-label">Chat ID менеджера</span>
+                <span class="config-value">{{ config.MANAGER_CHAT_ID }}</span>
+            </div>
+
+            <div class="config-item">
+                <span class="config-label">Проверка подписки</span>
+                <span
+                    class="config-value {% if config.CHECK_SUBSCRIPTION_ENABLED %}enabled{% else %}disabled{% endif %}">
+                    {{ 'Включена' if config.CHECK_SUBSCRIPTION_ENABLED else 'Выключена' }}
+                </span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Веб-приложение</h2>
+
+            <div class="config-item">
+                <span class="config-label">URL приложения</span>
+                <span class="config-value">{{ config.WEB_APP_URL[:40] }}...</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Google Sheets</h2>
+
+            <div class="config-item">
+                <span class="config-label">Интеграция</span>
+                <span class="config-value {% if config.GOOGLE_SHEETS_ENABLED %}enabled{% else %}disabled{% endif %}">
+                    {{ 'Включена' if config.GOOGLE_SHEETS_ENABLED else 'Выключена' }}
+                </span>
+            </div>
+
+            <div class="config-item">
+                <span class="config-label">Таблица лидов</span>
+                <span class="config-value">{{ config.GOOGLE_SHEETS_LEADS_ID }}</span>
+            </div>
+
+            <div class="config-item">
+                <span class="config-label">Таблица тестов</span>
+                <span class="config-value">{{ config.GOOGLE_SHEETS_TESTS_ID }}</span>
+            </div>
+        </div>
+
+        <div class="note">
+            💡 Для изменения настроек отредактируйте файл <code>.env</code> и перезапустите сервер.
+        </div>
+    </main>
+</body>
+
+</html>
