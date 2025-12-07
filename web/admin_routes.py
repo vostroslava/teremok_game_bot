@@ -239,9 +239,10 @@ async def export_leads_to_sheets(request: Request):
         
         leads = await db.get_all_leads_full(limit=10000)
         
-        count = 0
+        # Prepare all data first
+        all_data = []
         for lead in leads:
-            data = {
+            all_data.append({
                 "type": "lead",
                 "name": lead.get("name", ""),
                 "role": lead.get("role", ""),
@@ -251,12 +252,19 @@ async def export_leads_to_sheets(request: Request):
                 "team_size": lead.get("team_size", ""),
                 "user_id": str(lead.get("user_id", "")),
                 "status": lead.get("status", "new")
-            }
-            if await send_to_sheets(data):
-                count += 1
+            })
+            
+        # Send in batches of 50
+        BATCH_SIZE = 50
+        sent_count = 0
         
-        logger.info(f"Full leads export completed: {count}/{len(leads)} leads")
-        return JSONResponse({"status": "ok", "count": count})
+        for i in range(0, len(all_data), BATCH_SIZE):
+            batch = all_data[i:i + BATCH_SIZE]
+            if await send_to_sheets(batch):
+                sent_count += len(batch)
+        
+        logger.info(f"Full leads export completed: {sent_count}/{len(leads)} leads")
+        return JSONResponse({"status": "ok", "count": sent_count})
     except Exception as e:
         logger.error(f"Export leads failed: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -276,7 +284,7 @@ async def export_tests_to_sheets(request: Request):
         
         tests = await db.get_all_tests_full(limit=10000)
         
-        count = 0
+        all_data = []
         for test in tests:
             # Parse scores
             scores_str = ""
@@ -289,7 +297,7 @@ async def export_tests_to_sheets(request: Request):
                 except:
                     scores_str = str(test.get("scores", ""))
 
-            data = {
+            all_data.append({
                 "type": "test",
                 "name": test.get("name", ""),
                 "role": test.get("role", ""),
@@ -299,12 +307,19 @@ async def export_tests_to_sheets(request: Request):
                 "scores": scores_str,
                 "product": test.get("product", "teremok"),
                 "user_id": str(test.get("user_id", ""))
-            }
-            if await send_to_sheets(data):
-                count += 1
+            })
+            
+        # Send in batches
+        BATCH_SIZE = 50
+        sent_count = 0
         
-        logger.info(f"Full tests export completed: {count}/{len(tests)} tests")
-        return JSONResponse({"status": "ok", "count": count})
+        for i in range(0, len(all_data), BATCH_SIZE):
+            batch = all_data[i:i + BATCH_SIZE]
+            if await send_to_sheets(batch):
+                sent_count += len(batch)
+        
+        logger.info(f"Full tests export completed: {sent_count}/{len(tests)} tests")
+        return JSONResponse({"status": "ok", "count": sent_count})
     except Exception as e:
         logger.error(f"Export tests failed: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)

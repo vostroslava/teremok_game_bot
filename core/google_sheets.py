@@ -5,21 +5,24 @@ Simple HTTP POST to Google Apps Script - no auth required
 import json
 import logging
 import httpx
-from typing import Optional
+from typing import Union, List, Optional
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def send_to_sheets(data: dict) -> bool:
-    """Send data to Google Sheets via webhook"""
+async def send_to_sheets(data: Union[dict, List[dict]]) -> bool:
+    """
+    Send data to Google Sheets via webhook
+    Accepts single dict or list of dicts (batch)
+    """
     webhook_url = settings.GOOGLE_SHEETS_WEBHOOK_URL
     
     if not webhook_url:
         return False
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 webhook_url,
                 json=data,
@@ -27,7 +30,8 @@ async def send_to_sheets(data: dict) -> bool:
             )
             
             if response.status_code == 200:
-                logger.info(f"Sent to Google Sheets: {data.get('type')}")
+                count = len(data) if isinstance(data, list) else 1
+                logger.info(f"Sent to Google Sheets: {count} items")
                 return True
             else:
                 logger.error(f"Google Sheets webhook error: {response.status_code}")
