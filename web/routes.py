@@ -451,131 +451,115 @@ async def get_formula_questions():
     ]
     return {"questions": questions, "total": len(questions)}
 
-# API: Submit result
-@router.post("/api/formula/submit")
-async def submit_formula_results(request: Request):
-    """
-    Submit Formula test results.
-    Expected JSON:
-    {
-        "employee_name": "str",
-        "employee_role": "str",
-        "answers": [1, 2, 4, ...], # list of scores
-        "user_id": int
-    }
-    """
+
+# ===== FORMULA (RSP) MODULE =====
+
+@app.get("/api/formula/rsp/questions")
+async def get_formula_rsp_questions():
+    """Get questions for Formula RSP test"""
+    from core.formula_rsp_questions import FORMULA_RSP_QUESTIONS
+    return JSONResponse({"questions": FORMULA_RSP_QUESTIONS})
+
+@app.post("/api/formula/rsp/submit")
+async def submit_formula_rsp_results(request: Request):
     try:
         data = await request.json()
         user_id = data.get('user_id')
         name = data.get('employee_name')
         role = data.get('employee_role')
-        answers = data.get('answers') # List of scores
+        answers = data.get('answers') # List of strings ['result', 'process', ...]
         
         if not user_id or not answers:
-            # If user_id is missing (e.g. web test), generate a random one or use 0 but handle FK
-            # For now, if 0, let's treat as anonymous
-            if not user_id: 
+             # Random ID for guest flow if missing
+             if not user_id: 
                  import random
                  user_id = random.randint(1000000, 9999999)
         
-        # Ensure user exists in contacts to satisfy FK
-        # We don't have manager info here, so we create a placeholder
+        # Ensure contact exists (Guest)
         from core.database import has_contact, save_contact
         if not await has_contact(user_id):
             await save_contact(
                 user_id=user_id,
-                name="Web User",
-                role="Guest",
+                name=name or "Web User",
+                role=role or "Guest",
                 company="",
                 team_size="",
                 phone="",
                 telegram_username=None,
-                product="formula"
+                product="formula_rsp"
             )
 
         # Calculate result
-        from core.formula_logic import compute_formula_level
-        result = compute_formula_level(answers)
+        from core.formula_rsp_logic import compute_formula_rsp
+        result = compute_formula_rsp(answers)
         
-        # Prepare "answers" dict for DB storage (fake question ids)
-        # We store just the scores list in "scores" column usually, but let's follow pattern
-        answers_dict = {str(i+1): score for i, score in enumerate(answers)}
+        # Save to DB (New table)
+        from core.database import save_formula_rsp_result, get_contact
         
-        # Save to DB
-        test_id = await save_test_result(
+        test_id = await save_formula_rsp_result(
             user_id=user_id,
-            result_type=result.level.code,
-            answers=answers_dict,
-            scores={"total": result.total_score, "level": result.level.code}, # Store simple score metadata
-            product='formula'
+            primary_code=result.primary_code,
+            primary_name=result.primary_name,
+            scores=result.scores,
+            answers=answers
         )
-        logger.info(f"Formula result saved for user {user_id}: {result.level.code} (ID: {test_id})")
         
-        # Get user contact for export
-        contact = await get_contact(user_id)
+        logger.info(f"Formula RSP result saved for {user_id}: {result.primary_code} (ID: {test_id})")
         
         # Export to Google Sheets
+        contact = await get_contact(user_id)
         try:
             from core.google_sheets import export_test_to_sheets
-            # Override contact info with employee info for this specific test entry if needed, 
-            # OR just pass the employee info in the test data. 
-            # The sheet logic takes name/role from lead if present, or test if present.
-            # Let's verify existing logic: export_test_to_sheets checks lead first.
-            # But here we are testing an EMPLOYEE, not the user themselves. 
-            # Ideally we want to see "Employee Name" in the sheet.
-            # Let's pass it in the test dict which will be mapped.
-            
+            # Adapt export function to handle RSP structure
+            # We'll pass scores dict directly
             await export_test_to_sheets(
                 test={
                     "user_id": user_id, 
-                    "result_type": result.level.name, # Use readable name
-                    "scores": {"total": result.total_score}, 
-                    "product": "formula", 
+                    "result_type": result.primary_name,
+                    "scores": result.scores,
+                    "product": "formula_rsp",
                     "test_id": test_id,
-                    "name": name, # Explicitly pass employee name
-                    "role": role  # Explicitly pass employee role
+                    "name": name,
+                    "role": role 
                 },
-                lead=contact # We still pass lead to link it to the account
+                lead=contact
             )
         except Exception as e:
-            logger.error(f"Failed to export Formula test to sheets: {e}")
+            logger.error(f"Failed to export Formula RSP to sheets: {e}")
 
         # Return result
         return JSONResponse({
             "status": "success",
             "result": {
                 "id": test_id,
-                "total_score": result.total_score,
-                "level_code": result.level.code,
-                "level_name": result.level.name,
-                "short_description": result.level.short_description,
-                "recommendations": result.level.recommendations,
-                "emoji": result.level.emoji
+                "primary_code": result.primary_code,
+                "primary_name": result.primary_name,
+                "secondary_codes": result.secondary_codes,
+                "scores": result.scores,
+                "description": result.description,
+                "recommendations": result.recommendations,
+                "emoji": result.emoji
             }
         })
 
     except Exception as e:
-        logger.error(f"Error in submit_formula_results: {e}")
+        logger.error(f"Error in submit_formula_rsp_results: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
+@app.get("/app/formula/rsp_test", response_class=HTMLResponse)
+async def formula_rsp_test_page(request: Request):
+    """Main page for Formula RSP test"""
+    return templates.TemplateResponse("formula/rsp_test.html", {"request": request})
 
-# Pages
-@app.get("/app/formula/overview")
-async def formula_overview_page_redirect(request: Request):
-    # This was a placeholder, redirecting to info or using new template
-    return RedirectResponse(url="/app/formula/info")
-
-@app.get("/app/formula/info")
+@app.get("/app/formula/info", response_class=HTMLResponse)
 async def formula_info_page(request: Request):
-    from core.formula_levels import FORMULA_LEVELS
-    return templates.TemplateResponse("formula/info.html", {
-        "request": request,
-        "levels": FORMULA_LEVELS
-    })
+    """Info page redirected to test or separate info"""
+    # For now, let's keep it as separate info page or redirect to test?
+    # User asked for /app/formula/info as optional, but let's make it render a simple info page 
+    # OR reuse the one we had but adapted. 
+    # Actually, let's redirect to rsp_test as the landing for now if simpler
+    return templates.TemplateResponse("formula/rsp_test.html", {"request": request})
 
-@app.get("/app/formula/self_test")
-async def formula_self_test_page(request: Request):
-    return templates.TemplateResponse("formula/self_test.html", {"request": request})
 
 @app.get("/app/formula/result/{test_id}")
 async def formula_result_page(request: Request, test_id: int):

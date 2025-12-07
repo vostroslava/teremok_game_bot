@@ -94,6 +94,25 @@ async def ensure_db_exists():
         
         await db.commit()
 
+        # Formula RSP results table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS formula_rsp_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                primary_type_code TEXT NOT NULL,
+                primary_type_name TEXT NOT NULL,
+                scores TEXT,
+                answers TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user_contacts(user_id)
+            )
+        """)
+        
+        # Migration: add table if upgrading
+        # (Already handled by IF NOT EXISTS, effectively)
+        
+        await db.commit()
+
 async def add_user(user_id: int, username: str, first_name: str):
     async with aiosqlite.connect(settings.DB_NAME) as db:
         await db.execute(
@@ -160,6 +179,20 @@ async def save_test_result(user_id: int, result_type: str, answers: dict,
         )
         await db.commit()
         return cursor.lastrowid
+
+async def save_formula_rsp_result(user_id: int, primary_code: str, primary_name: str, 
+                                  scores: dict, answers: list) -> int:
+    """Save Formula RSP test result"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        cursor = await db.execute(
+            """INSERT INTO formula_rsp_results 
+               (user_id, primary_type_code, primary_type_name, scores, answers)
+               VALUES (?, ?, ?, ?, ?)""",
+            (user_id, primary_code, primary_name, json.dumps(scores), json.dumps(answers))
+        )
+        await db.commit()
+        return cursor.lastrowid
+
 
 async def get_test_results(user_id: int) -> list:
     """Get all test results for a user"""
