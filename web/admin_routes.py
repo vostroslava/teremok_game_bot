@@ -235,16 +235,28 @@ async def export_leads_to_sheets(request: Request):
         return JSONResponse({"error": "Google Sheets интеграция отключена"}, status_code=400)
     
     try:
-        from core.google_sheets import get_sheets_client
-        client = get_sheets_client()
-        if not client:
-            return JSONResponse({"error": "Google Sheets не настроен"}, status_code=400)
+        from core.google_sheets import send_to_sheets
         
         leads = await db.get_all_leads_full(limit=10000)
-        client.full_export_leads(leads)
         
-        logger.info(f"Full leads export completed: {len(leads)} leads")
-        return JSONResponse({"status": "ok", "count": len(leads)})
+        count = 0
+        for lead in leads:
+            data = {
+                "type": "lead",
+                "name": lead.get("name", ""),
+                "role": lead.get("role", ""),
+                "company": lead.get("company", ""),
+                "phone": lead.get("phone", ""),
+                "telegram": lead.get("telegram_username", ""),
+                "team_size": lead.get("team_size", ""),
+                "user_id": str(lead.get("user_id", "")),
+                "status": lead.get("status", "new")
+            }
+            if await send_to_sheets(data):
+                count += 1
+        
+        logger.info(f"Full leads export completed: {count}/{len(leads)} leads")
+        return JSONResponse({"status": "ok", "count": count})
     except Exception as e:
         logger.error(f"Export leads failed: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -259,16 +271,40 @@ async def export_tests_to_sheets(request: Request):
         return JSONResponse({"error": "Google Sheets интеграция отключена"}, status_code=400)
     
     try:
-        from core.google_sheets import get_sheets_client
-        client = get_sheets_client()
-        if not client:
-            return JSONResponse({"error": "Google Sheets не настроен"}, status_code=400)
+        from core.google_sheets import send_to_sheets
+        import json
         
         tests = await db.get_all_tests_full(limit=10000)
-        client.full_export_tests(tests)
         
-        logger.info(f"Full tests export completed: {len(tests)} tests")
-        return JSONResponse({"status": "ok", "count": len(tests)})
+        count = 0
+        for test in tests:
+            # Parse scores
+            scores_str = ""
+            if test.get("scores"):
+                try:
+                    scores = test["scores"]
+                    if isinstance(scores, str):
+                        scores = json.loads(scores)
+                    scores_str = ", ".join([f"{k}: {v}" for k, v in scores.items()])
+                except:
+                    scores_str = str(test.get("scores", ""))
+
+            data = {
+                "type": "test",
+                "name": test.get("name", ""),
+                "role": test.get("role", ""),
+                "company": test.get("company", ""),
+                "phone": test.get("phone", ""),
+                "result_type": test.get("result_type", ""),
+                "scores": scores_str,
+                "product": test.get("product", "teremok"),
+                "user_id": str(test.get("user_id", ""))
+            }
+            if await send_to_sheets(data):
+                count += 1
+        
+        logger.info(f"Full tests export completed: {count}/{len(tests)} tests")
+        return JSONResponse({"status": "ok", "count": count})
     except Exception as e:
         logger.error(f"Export tests failed: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
