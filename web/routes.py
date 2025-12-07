@@ -465,9 +465,12 @@ async def submit_formula_rsp_results(request: Request):
     try:
         data = await request.json()
         user_id = data.get('user_id')
+        # employee_name/role might not be sent if we skipped form (subscribed user)
+        # So we try to get them, but don't force save_contact if they are missing
+        
         name = data.get('employee_name')
         role = data.get('employee_role')
-        answers = data.get('answers') # List of strings ['result', 'process', ...]
+        answers = data.get('answers') 
         
         if not user_id or not answers:
              # Random ID for guest flow if missing
@@ -475,13 +478,29 @@ async def submit_formula_rsp_results(request: Request):
                  import random
                  user_id = random.randint(1000000, 9999999)
         
-        # Ensure contact exists (Guest)
-        from core.database import has_contact, save_contact
-        if not await has_contact(user_id):
-            await save_contact(
+        # Ensure contact exists (Guest or Subscribed)
+        from core.database import has_contact, save_contact, get_contact
+        
+        user_has_contact = await has_contact(user_id)
+        
+        # If we have explicit Name/Role in payload (from Form), update/save contact
+        if name and role:
+             await save_contact(
                 user_id=user_id,
-                name=name or "Web User",
-                role=role or "Guest",
+                name=name,
+                role=role,
+                company="", # We might not catch company in this payload if simplified form
+                team_size="",
+                phone="",
+                telegram_username=None,
+                product="formula_rsp"
+            )
+        elif not user_has_contact:
+            # No contact and no payload -> Create guest
+             await save_contact(
+                user_id=user_id,
+                name="Guest User",
+                role="Guest",
                 company="",
                 team_size="",
                 phone="",
@@ -494,7 +513,7 @@ async def submit_formula_rsp_results(request: Request):
         result = compute_formula_rsp(answers)
         
         # Save to DB (New table)
-        from core.database import save_formula_rsp_result, get_contact
+        from core.database import save_formula_rsp_result
         
         test_id = await save_formula_rsp_result(
             user_id=user_id,
@@ -546,8 +565,8 @@ async def submit_formula_rsp_results(request: Request):
         logger.error(f"Error in submit_formula_rsp_results: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-@app.get("/app/formula/rsp_test", response_class=HTMLResponse)
-async def formula_rsp_test_page(request: Request):
+@app.get("/app/formula/self_test", response_class=HTMLResponse)
+async def formula_self_test_page(request: Request):
     """Main page for Formula RSP test"""
     return templates.TemplateResponse("formula/rsp_test.html", {"request": request})
 
@@ -586,7 +605,8 @@ async def formula_result_page(request: Request, test_id: int):
     try:
         async with aiosqlite.connect(settings.DB_NAME) as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM test_results WHERE id = ?", (test_id,)) as cursor:
+            # Use formula_rsp_results table
+            async with db.execute("SELECT * FROM formula_rsp_results WHERE id = ?", (test_id,)) as cursor:
                 row = await cursor.fetchone()
         
         if not row:
@@ -594,28 +614,32 @@ async def formula_result_page(request: Request, test_id: int):
             
         row_dict = dict(row)
         
-        # Reconstruct level data
-        from core.formula_levels import FORMULA_LEVELS
-        level_code = row_dict['result_type']
-        level = FORMULA_LEVELS.get(level_code)
+        # Get detailed type info from RSP types
+        from core.formula_rsp_types import get_rsp_type, FORMULA_RSP_TYPES
         
-        # Clean up fallback if needed
-        if not level:
-             level = FORMULA_LEVELS.get('green') # fallback
+        # primary_type_code field from DB
+        type_code = row_dict['primary_type_code']
+        type_info = get_rsp_type(type_code)
+        
+        if not type_info:
+            # Fallback
+            type_info = get_rsp_type("result")
              
-        # Parse scores if needed
+        # Parse scores
         import json
         try:
-             scores_data = json.loads(row_dict['scores']) if isinstance(row_dict['scores'], str) else row_dict['scores']
-             total_score = scores_data.get('total', 0)
+             scores = json.loads(row_dict['scores']) if isinstance(row_dict['scores'], str) else row_dict['scores']
         except:
-             total_score = 0
+             scores = {}
+             
+        # All types for chart
+        all_types = list(FORMULA_RSP_TYPES.values())
              
         return templates.TemplateResponse("formula/result.html", {
             "request": request,
-            "level": level,
-            "total_score": total_score,
-            "test_id": test_id
+            "type_info": type_info,
+            "scores": scores,
+            "all_types": all_types
         })
             
     except Exception as e:

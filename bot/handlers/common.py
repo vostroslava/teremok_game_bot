@@ -28,8 +28,26 @@ async def cmd_help(message: Message):
 @router.message(Command("id"))
 async def cmd_id(message: Message):
     await message.answer(
-        f"🔑 **Ваш Telegram ID:**\n`{message.from_user.id}`\n\n"
         f"👤 Username: @{message.from_user.username or 'не указан'}",
+        parse_mode="Markdown"
+    )
+
+@router.message(Command("formula"))
+async def cmd_formula(message: Message):
+    """Launch Formula RSP Test"""
+    base_url = settings.WEB_APP_URL.rstrip('/') if settings.WEB_APP_URL else "https://localhost:8000"
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🧪 Открыть меню Формулы", 
+            web_app=WebAppInfo(url=base_url + "/app/formula/overview")
+        )
+    ]])
+    
+    await message.answer(
+        "⚙️ **Формула Успешной Команды**\n\n"
+        "Пройдите тест, чтобы определить свой управленческий тип (Результатник / Статусник / Процессник).",
+        reply_markup=markup,
         parse_mode="Markdown"
     )
 

@@ -18,7 +18,7 @@ def hub_menu_keyboard() -> InlineKeyboardMarkup:
     ))
     builder.row(InlineKeyboardButton(
         text="⚙️ Формула команды",
-        web_app=WebAppInfo(url=base_url + "/app/formula/rsp_test")
+        web_app=WebAppInfo(url=base_url + "/app/formula/overview")
     ))
     
     # URL кнопка для канала (открывает Telegram напрямую)

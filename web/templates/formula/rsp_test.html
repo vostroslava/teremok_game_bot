@@ -633,6 +633,7 @@
         let state = 'loading';
         let userId = null;
         let isSubscribed = false;
+        let hasContact = false; // Added missing variable
 
         let employeeName = '';
         let employeeRole = '';
@@ -670,6 +671,7 @@
                         const subRes = await fetch(`/api/check-subscription?user_id=${userId}`);
                         const subData = await subRes.json();
                         isSubscribed = subData.subscribed;
+                        hasContact = subData.has_contact || false; // Assign hasContact
                     } catch (e) {
                         console.warn("Sub check failed", e);
                     }
@@ -683,6 +685,7 @@
             }
         });
 
+        // ===== State Management =====
         function changeState(newState) {
             state = newState;
             // Hide all
@@ -701,28 +704,20 @@
                     document.getElementById('step1').classList.add('completed');
                     document.getElementById('step2').classList.add('active');
 
-                    // Logic: If subscribed, we might skip this full form?
-                    // User requirement: "If has subscription -> form skipped OR registration"
-                    // But we DO need "Employee Name" for the test context (who are we testing).
-                    // So we can show a SIMPLIFIED form (just Name/Role) vs FULL REGISTRATION (Phone/Company)
-
-                    if (isSubscribed) {
-                        // Show simplified form (hide Phone/Company if present)
-                        document.getElementById('fieldPhone').classList.add('hidden');
-                        document.getElementById('fieldCompany').classList.add('hidden');
-                        document.getElementById('contactTitle').textContent = "Данные сотрудника";
-                        document.getElementById('contactSubtitle').textContent = "Кого мы оцениваем?";
-                        document.getElementById('inputPhone').required = false;
-                        document.getElementById('inputCompany').required = false;
-                    } else {
-                        // Show full registration
-                        document.getElementById('fieldPhone').classList.remove('hidden');
-                        document.getElementById('fieldCompany').classList.remove('hidden');
-                        document.getElementById('contactTitle').textContent = "Регистрация";
-                        document.getElementById('contactSubtitle').textContent = "Заполните данные для доступа к тесту";
-                        document.getElementById('inputPhone').required = true;
-                        document.getElementById('inputCompany').required = true;
+                    // Logic from Teremok:
+                    // If subscribed AND hasContact -> skip form automatically
+                    if (isSubscribed && hasContact) {
+                        changeState('test');
+                        return;
                     }
+
+                    // Show full registration if not skipped
+                    document.getElementById('fieldPhone').classList.remove('hidden');
+                    document.getElementById('fieldCompany').classList.remove('hidden');
+                    document.getElementById('contactTitle').textContent = "Регистрация";
+                    document.getElementById('contactSubtitle').textContent = "Заполните данные для доступа к тесту";
+                    document.getElementById('inputPhone').required = true;
+                    document.getElementById('inputCompany').required = true;
 
                     document.getElementById('contactSection').classList.remove('hidden');
                     break;
@@ -731,7 +726,8 @@
                     document.getElementById('step2').classList.add('completed');
                     document.getElementById('step3').classList.add('active');
                     document.getElementById('testSection').classList.remove('hidden');
-                    renderQuestion(0);
+                    // Ensure we render first question
+                    if (currentQuestionIndex === 0) renderQuestion(0);
                     break;
                 case 'result':
                     document.getElementById('step1').classList.add('completed');
@@ -744,66 +740,82 @@
         }
 
         function startTest() {
-            changeState('contacts');
+            // Check subscription and contact status
+            if (isSubscribed && hasContact) {
+                // Skip contacts, go directly to questions
+                changeState('test');
+            } else {
+                changeState('contacts');
+            }
         }
 
         async function submitContacts(e) {
             e.preventDefault();
             const name = document.getElementById('inputName').value.trim();
             const role = document.getElementById('inputRole').value.trim();
-
-            // Extra fields
-            const phone = document.getElementById('inputPhone').value.trim();
             const company = document.getElementById('inputCompany').value.trim();
+            const phone = document.getElementById('inputPhone').value.trim();
 
             if (!name || !role) return;
-            if (!isSubscribed && (!phone || !company)) return; // Force if not subscribed
 
+            // Validate Phone if visible/required
+            if (document.getElementById('inputPhone').required) {
+                const phoneDigits = phone.replace(/\D/g, '');
+                if (phoneDigits.length < 7) {
+                    alert('Введите корректный номер телефона');
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('submitContactsBtn');
+            btn.disabled = true;
+            btn.textContent = 'Сохранение...';
+
+            // Save globals
             employeeName = name;
             employeeRole = role;
 
-            // If not subscribed, save as Lead
-            if (!isSubscribed && userId !== 0) {
-                try {
-                    await fetch('/api/contacts', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            user_id: userId,
-                            name: name, // For lead, usually it's User Name, but here we might be mixing Context.
-                            // Wait. If I am "Ivan", and I test "Petr (Employee)".
-                            // The registration is about ME (Ivan). The test is about PETR.
-                            // This is a bit ambiguous in the UI.
-                            // "Registration" implies MY data. "Employee Data" implies THEIR data.
-                            // For simplicity given the scope: We treat the "Employee" fields as the primary data point for now?
-                            // OR we ask 2 things?
-                            // User requirement: "registration".
-                            // Let's assume the fields Name/Phone/Company are about the USER (Lead), and Role is about USER or Employee?
-                            // Re-reading screenshot: "Mini-test. Find out YOUR type".
-                            // Ah! It says "YOUR type" (Свой типаж).
-                            // So it is a SELF-TEST?
-                            // User Request earlier: "Employee mini-test".
-                            // BUT screenshot says "Узнайте свой типаж".
-                            // If it is SELF-TEST, then "Employee Name" is "Your Name".
-                            // So Name/Role/Company/Phone is all about the USER.
-                            // Perfect.
-                            role: role,
-                            company: company,
-                            phone: phone,
-                            product: 'formula_rsp_lead'
-                        })
-                    });
-                } catch (e) { console.error(e); }
-            }
+            try {
+                await fetch('/api/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        name: name,
+                        role: role,
+                        company: company,
+                        team_size: "", // Formula form doesn't asked team size originally? 
+                        // Let's keep it simple or add it if needed. Teremok has it.
+                        // Prompt said "copy part from there". 
+                        // If Teremok has team_size, we should send something or add field.
+                        // For now send empty string or add field? 
+                        // Let's add field to HTML below if needed, but for now empty string is safe.
+                        phone: phone,
+                        product: 'formula_rsp_lead'
+                    })
+                });
 
-            changeState('test');
+                hasContact = true; // Update local state
+                changeState('test');
+
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка сохранения контактов');
+                btn.disabled = false;
+                btn.textContent = 'Продолжить →';
+            }
         }
 
-        let currentQIndex = 0;
+        let currentQuestionIndex = 0; // Unified variable name
 
         function renderQuestion(index) {
-            currentQIndex = index;
+            currentQuestionIndex = index;
             const q = questions[index];
+
+            if (!q) {
+                console.error("Question not found for index", index);
+                return;
+            }
 
             // Update progress
             const pct = Math.round(((index) / questions.length) * 100);
@@ -828,14 +840,14 @@
         }
 
         async function selectOption(code) {
-            answers[currentQIndex] = code;
+            answers[currentQuestionIndex] = code;
 
             // Highlight selected visual (optional, since we auto-advance)
             // Auto advance
-            if (currentQIndex < questions.length - 1) {
+            if (currentQuestionIndex < questions.length - 1) {
                 // Delay slightly for visual feedback? 
                 // Currently just jump.
-                renderQuestion(currentQIndex + 1);
+                renderQuestion(currentQuestionIndex + 1);
             } else {
                 // Finish
                 await finishTest();
@@ -862,45 +874,19 @@
                 if (!res.ok) throw new Error("Server Error");
 
                 const data = await res.json();
-                renderResult(data.result);
-                changeState('result');
+
+                if (data.status === 'success' && data.result && data.result.id) {
+                    // Redirect to result page (Architecture match)
+                    window.location.href = `/app/formula/result/${data.result.id}`;
+                } else {
+                    alert('Ошибка обработки результата');
+                    window.location.reload();
+                }
 
             } catch (e) {
                 alert("Ошибка отправки результатов: " + e.message);
-                changeState('test'); // go back?
+                changeState('test');
             }
-        }
-
-        function renderResult(res) {
-            document.getElementById('resultEmoji').textContent = res.emoji;
-            document.getElementById('resultType').textContent = res.primary_name;
-            document.getElementById('resultDesc').textContent = res.description;
-
-            // Scores
-            const scoresContainer = document.getElementById('scoresGrid');
-            scoresContainer.innerHTML = '';
-            // Map codes to nice names
-            const typeNames = { 'result': 'Результат', 'status': 'Статус', 'process': 'Процесс' };
-
-            ['result', 'status', 'process'].forEach(code => {
-                const score = res.scores[code] || 0;
-                const div = document.createElement('div');
-                div.className = 'score-item';
-                div.innerHTML = `
-                    <div class="score-val">${score}</div>
-                    <div class="score-lbl">${typeNames[code]}</div>
-                `;
-                scoresContainer.appendChild(div);
-            });
-
-            // Recs
-            const recList = document.getElementById('recommendationsList');
-            recList.innerHTML = '';
-            res.recommendations.forEach(txt => {
-                const li = document.createElement('li');
-                li.textContent = txt;
-                recList.appendChild(li);
-            });
         }
     </script>
 </body>
