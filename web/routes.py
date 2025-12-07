@@ -26,11 +26,18 @@ def set_bot(bot):
     global bot_instance
     bot_instance = bot
 
-# API Endpoint to get types
+# API Endpoint to get types (legacy, for compatibility)
 @router.get("/api/types")
 async def get_types():
     # Convert dataclasses to dicts
     return {k: v.__dict__ for k, v in TYPES_DATA.items()}
+
+# API Endpoint to get Teremok types with full info
+@router.get("/api/teremok/types")
+async def get_teremok_types():
+    """Return all Teremok types with full descriptions for UI"""
+    from core.texts import get_types_for_api
+    return {"types": get_types_for_api()}
 
 # API Endpoint to get Teremok test questions
 @router.get("/api/teremok/questions")
