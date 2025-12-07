@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Админ-панель | Теремок{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/admin_theme.css">
+
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <div class="layout-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="brand">
+                🏠 Теремок
+            </div>
+
+            <nav>
+                <a href="/app/admin/dashboard{% if key %}?key={{ key }}{% endif %}"
+                    class="nav-link {% if request.url.path.endswith('/dashboard') or request.url.path == '/app/admin' %}active{% endif %}">
+                    <i data-feather="bar-chart-2"></i> Дашборд
+                </a>
+                <a href="/app/admin/leads{% if key %}?key={{ key }}{% endif %}"
+                    class="nav-link {% if 'leads' in request.url.path %}active{% endif %}">
+                    <i data-feather="users"></i> Лиды
+                </a>
+                <a href="/app/admin/tests{% if key %}?key={{ key }}{% endif %}"
+                    class="nav-link {% if 'tests' in request.url.path %}active{% endif %}">
+                    <i data-feather="clipboard"></i> Тесты
+                </a>
+                <a href="/app/admin/settings{% if key %}?key={{ key }}{% endif %}"
+                    class="nav-link {% if 'settings' in request.url.path %}active{% endif %}">
+                    <i data-feather="settings"></i> Настройки
+                </a>
+            </nav>
+
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                <a href="/app/hub" class="nav-link">
+                    <i data-feather="arrow-left-circle"></i> На сайт
+                </a>
+                <a href="/app/admin/logout" class="nav-link" style="color: var(--danger);">
+                    <i data-feather="log-out"></i> Выход
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Initialize Icons
+        feather.replace();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

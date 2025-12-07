@@ -1,303 +1,172 @@
-<!DOCTYPE html>
-<html lang="ru">
+{% extends "admin/base_admin.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админ-панель | Теремок</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card-bg: #1e293b;
-            --border: #334155;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --accent: #6366f1;
-            --accent-light: #818cf8;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --error: #ef4444;
-        }
+{% block content %}
+<div class="mb-8">
+    <h1>📊 Дашборд</h1>
+    <p style="color: var(--text-secondary);">Обзор активности за сегодня</p>
+</div>
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<!-- Stats Grid -->
+<div class="grid-cols-4 mb-8">
+    <div class="glass-panel stat-card">
+        <div class="stat-label">Всего лидов</div>
+        <div class="stat-value">{{ stats.total_leads }}</div>
+        <div class="badge badge-new">+{{ stats.leads_today }} сегодня</div>
+    </div>
+    <div class="glass-panel stat-card">
+        <div class="stat-label">Всего тестов</div>
+        <div class="stat-value">{{ stats.total_tests }}</div>
+        <div class="badge badge-active">+{{ stats.tests_today }} сегодня</div>
+    </div>
+    <div class="glass-panel stat-card">
+        <div class="stat-label">Лиды (7 дней)</div>
+        <div class="stat-value">{{ stats.leads_7d }}</div>
+    </div>
+    <div class="glass-panel stat-card">
+        <div class="stat-label">Тесты (7 дней)</div>
+        <div class="stat-value">{{ stats.tests_7d }}</div>
+    </div>
+</div>
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
+<!-- Activity Chart -->
+<div class="glass-panel" style="padding: 24px; margin-bottom: 32px;">
+    <h2>📈 Динамика активности</h2>
+    <div style="height: 300px; width: 100%;">
+        <canvas id="activityChart"></canvas>
+    </div>
+</div>
 
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 240px;
-            height: 100vh;
-            background: var(--card-bg);
-            border-right: 1px solid var(--border);
-            padding: 20px;
-        }
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('activityChart').getContext('2d');
 
-        .logo {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 32px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-        }
+        // Data from backend
+        const labels = {{ chart_labels | tojson
+    }};
+    const leadsData = {{ chart_leads | tojson }};
+    const testsData = {{ chart_tests | tojson }};
 
-        .nav-item {
-            display: block;
-            padding: 12px 16px;
-            color: var(--text-muted);
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            transition: all 0.2s;
-        }
-
-        .nav-item:hover,
-        .nav-item.active {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--accent-light);
-        }
-
-        .main {
-            margin-left: 240px;
-            padding: 24px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .page-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .stat-label {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .stat-sub {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .section {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-
-        .section-title {
-            font-size: 1.125rem;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        td {
-            font-size: 0.875rem;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .badge-new {
-            background: rgba(34, 197, 94, 0.2);
-            color: var(--success);
-        }
-
-        .badge-in_progress {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--warning);
-        }
-
-        .badge-done {
-            background: rgba(99, 102, 241, 0.2);
-            color: var(--accent-light);
-        }
-
-        .badge-spam {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--error);
-        }
-
-        .empty {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-muted);
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-
-            .main {
-                margin-left: 0;
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Лиды',
+                data: leadsData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2
+            }, {
+                label: 'Тесты',
+                data: testsData,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#e2e8f0', font: { family: "'Inter', sans-serif" } }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', precision: 0 }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8' }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
             }
         }
-    </style>
-</head>
+    });
+    });
+</script>
 
-<body>
-    <aside class="sidebar">
-        <div class="logo">🏠 Теремок Админ</div>
-        <nav>
-            <a href="/app/admin?key={{ key }}" class="nav-item active">📊 Дашборд</a>
-            <a href="/app/admin/leads?key={{ key }}" class="nav-item">👥 Лиды</a>
-            <a href="/app/admin/tests?key={{ key }}" class="nav-item">🧩 Тесты</a>
-            <a href="/app/admin/settings?key={{ key }}" class="nav-item">⚙️ Настройки</a>
-            <a href="/app/hub" class="nav-item">← Назад в хаб</a>
-        </nav>
-    </aside>
-
-    <main class="main">
-        <div class="header">
-            <h1 class="page-title">📊 Дашборд</h1>
+<div class="layout-container" style="gap: 24px; display: grid; grid-template-columns: 1fr 1fr;">
+    <!-- Recent Leads -->
+    <div class="glass-panel" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>👥 Последние лиды</h2>
+            <a href="/app/admin/leads" class="btn btn-primary" style="font-size: 0.75rem;">Все лиды</a>
         </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Всего лидов</div>
-                <div class="stat-value">{{ stats.total_leads }}</div>
-                <div class="stat-sub">+{{ stats.leads_today }} сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Всего тестов</div>
-                <div class="stat-value">{{ stats.total_tests }}</div>
-                <div class="stat-sub">+{{ stats.tests_today }} сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">За 7 дней</div>
-                <div class="stat-value">{{ stats.leads_7d }}</div>
-                <div class="stat-sub">лидов</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">За 7 дней</div>
-                <div class="stat-value">{{ stats.tests_7d }}</div>
-                <div class="stat-sub">тестов</div>
-            </div>
+        {% if recent_leads %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Телефон</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in recent_leads %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">{{ lead.name }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ lead.created_at[:10] }}</div>
+                    </td>
+                    <td>{{ lead.phone }}</td>
+                    <td><span class="badge badge-{{ lead.status or 'new' }}">{{ lead.status or 'new' }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Лидов пока нет</div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Tests -->
+    <div class="glass-panel" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>🧩 Последние тесты</h2>
+            <a href="/app/admin/tests" class="btn btn-primary" style="font-size: 0.75rem;">Все тесты</a>
         </div>
 
-        <div class="section">
-            <h2 class="section-title">👥 Последние лиды</h2>
-            {% if recent_leads %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Дата</th>
-                        <th>Имя</th>
-                        <th>Компания</th>
-                        <th>Телефон</th>
-                        <th>Статус</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lead in recent_leads %}
-                    <tr>
-                        <td>{{ lead.created_at[:16] if lead.created_at else '-' }}</td>
-                        <td>{{ lead.name }}</td>
-                        <td>{{ lead.company or '-' }}</td>
-                        <td>{{ lead.phone }}</td>
-                        <td><span class="badge badge-{{ lead.status or 'new' }}">{{ lead.status or 'new' }}</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="empty">Лидов пока нет</div>
-            {% endif %}
-        </div>
-
-        <div class="section">
-            <h2 class="section-title">🧩 Последние тесты</h2>
-            {% if recent_tests %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Дата</th>
-                        <th>Имя</th>
-                        <th>Типаж</th>
-                        <th>Продукт</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for test in recent_tests %}
-                    <tr>
-                        <td>{{ test.created_at[:16] if test.created_at else '-' }}</td>
-                        <td>{{ test.name or 'Аноним' }}</td>
-                        <td>{{ test.type_emoji or '' }} {{ test.type_name or test.result_type }}</td>
-                        <td>{{ test.product }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="empty">Тестов пока нет</div>
-            {% endif %}
-        </div>
-    </main>
-</body>
-
-</html>
+        {% if recent_tests %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Результат</th>
+                    <th>Продукт</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for test in recent_tests %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">{{ test.name or 'Аноним' }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ test.created_at[:10] }}</div>
+                    </td>
+                    <td>
+                        <span style="font-size: 1.25rem;">{{ test.type_emoji }}</span>
+                        {{ test.type_name or test.result_type }}
+                    </td>
+                    <td><span class="badge" style="background: rgba(255,255,255,0.1);">{{ test.product }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Тестов пока нет</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

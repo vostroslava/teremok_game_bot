@@ -1,6 +1,7 @@
 from .base import BaseRepository
 from models.test_result import TestResult, FormulaResult
 from typing import Optional, List, Dict
+from datetime import datetime, timedelta
 import json
 import logging
 
@@ -30,6 +31,58 @@ class TestRepository(BaseRepository):
             (result.user_id, result.primary_type_code, result.primary_type_name, scores_json, answers_json)
         )
         return cursor.lastrowid
+
+    async def get_all_tests_full(self, limit: int = 100, product: str = None,
+                                  result_type: str = None, days: int = None,
+                                  sort_by: str = "created_at", sort_order: str = "desc") -> list:
+        """Get test results with contact info and sorting"""
+        
+        query = """
+            SELECT t.*, 
+                   c.name, c.role, c.company, c.team_size, c.phone, c.telegram_username
+            FROM test_results t
+            LEFT JOIN user_contacts c ON t.user_id = c.user_id
+        """
+        conditions = []
+        params = []
+        
+        if product and product != 'all':
+            conditions.append("t.product = ?")
+            params.append(product)
+        
+        if result_type and result_type != 'all':
+            conditions.append("t.result_type = ?")
+            params.append(result_type)
+        
+        if days:
+            date_from = (datetime.now() - timedelta(days=days)).isoformat()
+            conditions.append("t.created_at >= ?")
+            params.append(date_from)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+            
+        # Sorting whitelist
+        sort_columns = {
+            "created_at": "t.created_at",
+            "result_type": "t.result_type",
+            "product": "t.product",
+            "name": "c.name",
+            "company": "c.company",
+            "role": "c.role"
+        }
+        
+        sort_col = sort_columns.get(sort_by, "t.created_at")
+        order = "ASC" if sort_order and sort_order.lower() == "asc" else "DESC"
+        
+        query += f" ORDER BY {sort_col} {order} LIMIT ?"
+        params.append(limit)
+        
+        return await self.fetch_all(query, tuple(params))
+
+    async def get_recent_tests_full(self, limit: int = 10) -> list:
+        """Get recent tests for dashboard"""
+        return await self.get_all_tests_full(limit=limit)
 
     async def get_user_results(self, user_id: int) -> List[TestResult]:
         rows = await self.fetch_all(

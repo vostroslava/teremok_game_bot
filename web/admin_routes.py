@@ -6,7 +6,6 @@ from fastapi import APIRouter, Request, Query, Depends, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from core.config import settings
-from core.database import get_stats, get_recent_leads, get_recent_tests, get_all_leads_full, get_all_tests_full # Legacy for stats
 from core.texts import TYPES_DATA
 from repositories.user_repository import UserRepository
 from services.auth_service import AuthService
@@ -16,10 +15,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from core.dependencies import user_repo, auth_service, user_service, test_service
+
+logger = logging.getLogger(__name__)
+
 # Dependecy Injection (Module Level for simplicity)
-user_repo = UserRepository()
-auth_service = AuthService(user_repo)
-user_service = UserService(user_repo)
+# user_repo = UserRepository()
+# auth_service = AuthService(user_repo)
+# user_service = UserService(user_repo)
 
 router = APIRouter(prefix="/app/admin", tags=["admin"])
 
@@ -140,18 +143,22 @@ async def admin_dashboard(request: Request, key: str = None):
     
     logger.info(f"Admin dashboard accessed from {request.client.host}")
     
-    # Get stats
-    stats = await get_stats()
+    # Get stats (still using legacy function for now)
+    stats = await user_service.get_statistics()
+    daily_stats = await user_service.get_daily_statistics()
     
-    # Get recent activity
-    recent_leads = await get_recent_leads(limit=5)
-    recent_tests = await get_recent_tests(limit=5)
+    # Get recent activity via service
+    recent_leads = await user_service.get_recent_leads_full(limit=5)
+    recent_tests = await test_service.get_recent_tests_full(limit=5)
     
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "stats": stats,
         "recent_leads": recent_leads,
         "recent_tests": recent_tests,
+        "chart_labels": daily_stats['labels'],
+        "chart_leads": daily_stats['leads'],
+        "chart_tests": daily_stats['tests'],
         "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
     })
     
@@ -180,7 +187,7 @@ async def admin_leads(request: Request,
     # Safely parse days
     days_val = int(days) if days and days.isdigit() else None
 
-    leads = await get_all_leads_full(
+    leads = await user_service.get_all_leads_full(
         limit=200,
         status=status if status != "all" else None,
         search=search if search else None,
@@ -219,7 +226,7 @@ async def admin_tests(request: Request,
     # Safely parse days
     days_val = int(days) if days and days.isdigit() else None
 
-    tests = await get_all_tests_full(
+    tests = await test_service.get_all_tests_full(
         limit=200,
         product=product if product != "all" else None,
         result_type=result_type if result_type != "all" else None,
@@ -303,7 +310,7 @@ async def export_leads_to_sheets(request: Request):
     try:
         from core.google_sheets import send_to_sheets
         
-        leads = await get_all_leads_full(limit=10000)
+        leads = await user_service.get_all_leads_full(limit=10000)
         
         # Prepare all data first
         all_data = []
@@ -348,7 +355,7 @@ async def export_tests_to_sheets(request: Request):
         from core.google_sheets import send_to_sheets
         import json
         
-        tests = await get_all_tests_full(limit=10000)
+        tests = await test_service.get_all_tests_full(limit=10000)
         
         all_data = []
         for test in tests:

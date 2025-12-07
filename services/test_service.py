@@ -44,3 +44,11 @@ class TestService:
         
         # Return full computer result object for frontend (adding derived fields)
         return computed
+
+    async def get_all_tests_full(self, limit: int = 100, product: str = None,
+                                  result_type: str = None, days: int = None,
+                                  sort_by: str = "created_at", sort_order: str = "desc") -> list:
+        return await self.test_repo.get_all_tests_full(limit, product, result_type, days, sort_by, sort_order)
+
+    async def get_recent_tests_full(self, limit: int = 10) -> list:
+        return await self.test_repo.get_recent_tests_full(limit)

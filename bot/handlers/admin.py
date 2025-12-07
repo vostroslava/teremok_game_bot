@@ -15,11 +15,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
 from core.config import settings
-from core.database import (
-    is_admin, get_admin_role, add_admin, remove_admin, 
-    get_all_admins, get_all_leads, get_leads_count, get_tests_count
-)
+from core.database import get_all_leads # Legacy, todo: move to repo
 from core.texts import TYPES_DATA
+from core.dependencies import user_service
 
 router = Router()
 
@@ -35,15 +33,14 @@ async def cmd_admin(message: Message):
     user_id = message.from_user.id
     
     # Check access
-    if not is_owner(user_id) and not await is_admin(user_id):
+    if not is_owner(user_id) and not await user_service.is_admin(user_id):
         await message.answer("❌ У вас нет доступа к админ-панели.")
         return
     
     role = "👑 Владелец" if is_owner(user_id) else "👤 Админ"
     
     # Get stats
-    leads_count = await get_leads_count()
-    tests_count = await get_tests_count()
+    stats = await user_service.get_statistics()
     
     # Build admin panel URL
     admin_url = ""
@@ -55,18 +52,14 @@ async def cmd_admin(message: Message):
         f"🔐 <b>Админ-панель</b>\n\n"
         f"Ваша роль: {role}\n\n"
         f"📊 <b>Быстрая сводка:</b>\n"
-        f"• Заявок: {leads_count}\n"
-        f"• Тестов: {tests_count}\n"
+        f"• Заявок: {stats.get('total_leads', 0)}\n"
+        f"• Тестов: {stats.get('total_tests', 0)}\n"
     )
     
     if admin_url:
         text += (
             f"\n🌐 <b>Веб-админка:</b>\n"
             f"<a href=\"{admin_url}\">Открыть панель управления</a>\n\n"
-            f"Там вы найдёте:\n"
-            f"• Детальную статистику\n"
-            f"• Управление лидами (статусы, заметки)\n"
-            f"• Экспорт в Google Sheets\n"
         )
     
     text += (
@@ -91,14 +84,14 @@ async def cmd_leads(message: Message):
     """View recent leads with quick stats"""
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not await is_admin(user_id):
+    if not is_owner(user_id) and not await user_service.is_admin(user_id):
         await message.answer("❌ У вас нет доступа.")
         return
     
     # Get stats
-    from core.database import get_stats
-    stats = await get_stats()
+    stats = await user_service.get_statistics()
     
+    # Get leads (legacy call for complex query)
     leads = await get_all_leads(limit=5)
     
     text = (
@@ -141,13 +134,15 @@ async def cmd_stats(message: Message):
     """View detailed statistics"""
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not await is_admin(user_id):
+    if not is_owner(user_id) and not await user_service.is_admin(user_id):
         await message.answer("❌ У вас нет доступа.")
         return
     
-    leads_count = await get_leads_count()
-    tests_count = await get_tests_count()
-    admins = await get_all_admins()
+    stats = await user_service.get_statistics()
+    admins = await user_service.get_admins()
+    
+    leads_count = stats.get('total_leads', 0)
+    tests_count = stats.get('total_tests', 0)
     
     text = (
         f"📊 <b>Статистика</b>\n\n"
@@ -182,7 +177,7 @@ async def cmd_addadmin(message: Message):
         await message.answer("❌ user_id должен быть числом.")
         return
     
-    await add_admin(new_admin_id, role='admin', added_by=message.from_user.id)
+    await user_service.add_admin(new_admin_id, username="unknown", role='admin', added_by=message.from_user.id)
     await message.answer(f"✅ Пользователь {new_admin_id} добавлен как админ.")
 
 
@@ -204,7 +199,7 @@ async def cmd_deladmin(message: Message):
         await message.answer("❌ user_id должен быть числом.")
         return
     
-    await remove_admin(admin_id)
+    await user_service.remove_admin(admin_id)
     await message.answer(f"✅ Пользователь {admin_id} удалён из админов.")
 
 
@@ -215,7 +210,7 @@ async def cmd_admins(message: Message):
         await message.answer("❌ Только владелец может смотреть список админов.")
         return
     
-    admins = await get_all_admins()
+    admins = await user_service.get_admins()
     
     if not admins:
         text = "👥 Админов нет.\n\nДобавить: /addadmin &lt;user_id&gt;"

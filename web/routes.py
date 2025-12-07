@@ -20,14 +20,16 @@ from repositories.test_repository import TestRepository
 from services.user_service import UserService
 from services.test_service import TestService
 from models.user import UserContact
+from core.dependencies import user_service, test_service, user_repo, test_repo, notification_service
+
 
 logger = logging.getLogger(__name__)
 
 # Service Instantiation
-user_repo = UserRepository()
-test_repo = TestRepository()
-user_service = UserService(user_repo)
-test_service = TestService(test_repo)
+# user_repo = UserRepository()
+# test_repo = TestRepository()
+# user_service = UserService(user_repo)
+# test_service = TestService(test_repo)
 
 app = FastAPI()
 app.state.limiter = limiter
@@ -38,12 +40,9 @@ router = APIRouter()
 templates_path = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=templates_path)
 
-# Bot instance for notifications (will be set from main.py)
-bot_instance = None
-
+# Bot instance for notifications
 def set_bot(bot):
-    global bot_instance
-    bot_instance = bot
+    notification_service.set_bot(bot)
 
 # API Endpoint to get types (legacy, for compatibility)
 @router.get("/api/types")
@@ -85,6 +84,8 @@ async def check_subscription(user_id: int):
         has_contact: bool - оставлены ли контакты ранее
         channel_username: str - username канала
     """
+    # Use notification_service's bot_instance for subscription check
+    bot_instance = notification_service.get_bot_instance()
     if not bot_instance:
         return JSONResponse({"subscribed": False, "has_contact": False, "error": "Bot not initialized"})
     
@@ -140,16 +141,15 @@ async def save_user_contacts(request: Request):
         await user_service.register_contact(contact)
         logger.info(f"Contacts saved for user {user_id}")
         
-        # Отправляем короткое уведомление менеджеру
-        if bot_instance and settings.MANAGER_CHAT_ID:
-            try:
-                await bot_instance.send_message(
-                    chat_id=settings.MANAGER_CHAT_ID,
-                    text="📬 <b>Новая заявка!</b>\n\nИспользуйте /leads чтобы посмотреть детали.",
-                    parse_mode="HTML"
-                )
-            except Exception as e:
-                logger.error(f"Failed to send notification: {e}")
+        # Notification
+        await notification_service.notify_new_lead(
+            name=data['name'],
+            contact=data['phone'],
+            message=f"Role: {data['role']}, Company: {data['company']}",
+            source="Web API",
+            username=data.get('username'),
+            user_id=data.get('user_id')
+        )
         
         # Export to Google Sheets
         try:
@@ -170,38 +170,6 @@ async def save_user_contacts(request: Request):
             status_code=500
         )
 
-
-async def send_contact_notification_to_manager(bot, user_id: int, data: dict, product: str = "teremok"):
-    """
-    Отправляет первое уведомление менеджеру о новом лиде (контакты)
-    """
-    product_emoji = "🐭" if product == "teremok" else "⚙️"
-    product_name = "Теремок" if product == "teremok" else "Формула команды"
-    
-    tg_username = data.get('username') or 'не указан'
-    tg_link = f"@{tg_username}" if tg_username != 'не указан' else 'не указан'
-    
-    message = (
-        f"{product_emoji} <b>Новая заявка ({product_name})</b>\n\n"
-        f"👤 <b>Имя:</b> {data.get('name', 'Н/Д')}\n"
-        f"💼 <b>Роль:</b> {data.get('role', 'Н/Д')}\n"
-        f"🏢 <b>Компания:</b> {data.get('company', 'Н/Д')}\n"
-        f"👥 <b>Размер команды:</b> {data.get('team_size', 'Н/Д')}\n"
-        f"📞 <b>Телефон:</b> {data.get('phone', 'Н/Д')}\n"
-        f"💬 <b>Telegram:</b> {tg_link}\n"
-        f"🆔 <b>user_id:</b> <code>{user_id}</code>\n\n"
-        f"📝 <i>Пользователь заполнил контактную форму</i>"
-    )
-    
-    try:
-        await bot.send_message(
-            chat_id=settings.MANAGER_CHAT_ID,
-            text=message,
-            parse_mode="HTML"
-        )
-        logger.info(f"Contact notification sent to manager for user {user_id}")
-    except Exception as e:
-        logger.error(f"Failed to send contact notification to manager: {e}")
 
 # ==== NEW: Submit test results endpoint ====
 @router.post("/api/test/submit")
@@ -237,13 +205,14 @@ async def submit_test_results(request: Request):
         contact = await user_service.get_contact(user_id)
         
         # Отправляем уведомление менеджеру только если включено
-        if settings.SEND_NOTIFICATIONS and bot_instance and settings.MANAGER_CHAT_ID:
-            await send_test_notification_to_manager(
-                bot=bot_instance,
+        if settings.SEND_NOTIFICATIONS:
+            await notification_service.notify_test_result(
                 user_id=user_id,
                 contact=contact,
                 result_type=result_type,
-                answers=answers
+                answers=answers,
+                product="teremok",
+                scores=result_calc.get('scores', {})
             )
         
         # Экспорт в Google Sheets
@@ -251,7 +220,7 @@ async def submit_test_results(request: Request):
             # We add test_id just in case, though google sheets logic might not use it yet
             from core.google_sheets import export_test_to_sheets
             await export_test_to_sheets(
-                test={"user_id": user_id, "result_type": result_type, "scores": result.get('scores', {}), "product": "teremok", "test_id": test_id},
+                test={"user_id": user_id, "result_type": result_type, "scores": result_calc.get('scores', {}), "product": "teremok", "test_id": test_id},
                 lead=contact
             )
         except Exception as e:
@@ -318,104 +287,44 @@ async def teremok_result_page(request: Request, result_id: int):
         
 
 
-async def send_test_notification_to_manager(bot, user_id: int, contact: dict, result_type: str, answers: dict):
-    """
-    Отправляет уведомление менеджеру о прохождении теста
-    
-    Args:
-        bot: Экземпляр Bot
-        user_id: Telegram user_id
-        contact: Словарь с контактами или None
-        result_type: Результат теста (тип сотрудника)
-        answers: Словарь с ответами на вопросы
-    """
-    type_info = TYPES_DATA.get(result_type)
-    
-    # Формируем блок с контактами
-    if contact:
-        tg_username = contact.get('telegram_username') or 'не указан'
-        tg_link = f"@{tg_username}" if tg_username != 'не указан' else 'не указан'
-        contact_info = (
-            f"👤 <b>Имя:</b> {contact.get('name', 'Н/Д')}\n"
-            f"💼 <b>Роль:</b> {contact.get('role', 'Н/Д')}\n"
-            f"🏢 <b>Компания:</b> {contact.get('company', 'Н/Д')}\n"
-            f"👥 <b>Размер команды:</b> {contact.get('team_size', 'Н/Д')}\n"
-            f"📞 <b>Телефон:</b> {contact.get('phone', 'Н/Д')}\n"
-            f"💬 <b>Telegram:</b> {tg_link}\n"
-        )
-    else:
-        contact_info = "📢 <b>Подписан на канал, контакты не оставлены</b>\n"
-    
-    # Формируем сообщение
-    message = (
-        f"🎯 <b>Пользователь прошёл тест «Теремок»</b>\n\n"
-        f"{contact_info}"
-        f"🆔 <b>user_id:</b> <code>{user_id}</code>\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"<b>Результаты теста:</b>\n\n"
-    )
-    
-    if type_info:
-        message += (
-            f"{type_info.emoji} <b>Типаж:</b> {type_info.name_ru}\n\n"
-            f"<b>Описание:</b>\n{type_info.short_desc}\n\n"
-        )
-        
-        # Добавляем маркеры если есть
-        if type_info.markers:
-            markers_text = "\n".join([f"• {m}" for m in type_info.markers[:5]])
-            message += f"<b>Ключевые маркеры:</b>\n{markers_text}\n\n"
-    else:
-        message += f"<b>Типаж:</b> {result_type}\n\n"
-    
-    try:
-        await bot.send_message(
-            chat_id=settings.MANAGER_CHAT_ID,
-            text=message,
-            parse_mode="HTML"
-        )
-        logger.info(f"Test notification sent to manager for user {user_id}")
-    except Exception as e:
-        logger.error(f"Failed to send notification to manager: {e}")
-
-
 # Legacy endpoint (keep for backwards compatibility)
 @router.post("/api/submit-lead")
 async def submit_lead(request: Request):
     try:
         data = await request.json()
         name = data.get("name", "Не указано")
-        contact = data.get("contact", "Не указано")
+        contact_info_str = data.get("contact", "Не указано") # Renamed to avoid conflict with UserContact
         message = data.get("message", "")
         result_type = data.get("result_type", "")
         
         # Save to database
         await save_lead(
             user_id=0,  # Web user
-            contact_info=f"{name} | {contact}",
+            contact_info=f"{name} | {contact_info_str}",
             message=f"Результат: {result_type}\n\n{message}" if result_type else message
         )
         
         # Send to manager if bot is available (legacy behavior)
-        if bot_instance and settings.MANAGER_CHAT_ID:
-            notification_text = (
-                "📩 **Новая заявка с веб-приложения!**\n\n"
-                f"👤 **Имя:** {name}\n"
-                f"📞 **Контакт:** {contact}\n"
+        if settings.SEND_NOTIFICATIONS:
+            await notification_service.notify_new_lead(
+                name=name,
+                contact=contact_info_str,
+                message=message,
+                source="Legacy Web API",
+                username=None,
+                user_id=0
             )
-            if result_type:
-                notification_text += f"🎯 **Результат диагностики:** {result_type}\n"
-            if message:
-                notification_text += f"\n💬 **Сообщение:**\n{message}"
-            
-            try:
-                await bot_instance.send_message(
-                    chat_id=settings.MANAGER_CHAT_ID,
-                    text=notification_text,
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                print(f"Failed to send notification: {e}")
+        
+        if result_type:
+            # Also notify about test result if provided
+            await notification_service.notify_test_result(
+                 result_type=result_type,
+                 answers={}, # Not available in legacy lead
+                 contact={"name": name, "phone": contact_info_str},
+                 user_id=0, # Web user
+                 product="teremok", # assumed
+                 scores={} # Not available in legacy lead
+            )
         
         return JSONResponse({"status": "success", "message": "Заявка отправлена!"})
     except Exception as e:
@@ -548,6 +457,17 @@ async def submit_formula_rsp_results(request: Request):
             )
         except Exception as e:
             logger.error(f"Failed to export Formula RSP to sheets: {e}")
+
+        # Send notification
+        if settings.SEND_NOTIFICATIONS:
+            await notification_service.notify_test_result(
+                user_id=user_id,
+                contact=contact,
+                result_type=result_obj.primary_type_name,
+                answers=answers,
+                product="formula_rsp",
+                scores=result_obj.scores
+            )
 
         # Return result
         return JSONResponse({

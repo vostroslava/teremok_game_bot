@@ -117,39 +117,63 @@ async def process_contacts(message: Message, state: FSMContext):
 @router.message(LeadForm.waiting_for_request)
 async def process_request(message: Message, state: FSMContext):
     """Process final request and send to manager"""
+    from core.dependencies import user_service, notification_service
+    
     await state.update_data(request=message.text)
     
     # Get all collected data
     data = await state.get_data()
     
-    # Save to database
     try:
-        await save_lead(
-            user_id=message.from_user.id,
-            contact_info=f"{data.get('name', 'N/A')} | {data.get('contacts', 'N/A')}",
-            message=f"Роль: {data.get('role', 'N/A')}\nКомпания: {data.get('company', 'N/A')}\nКоманда: {data.get('team_size', 'N/A')}\n\nЗапрос: {data.get('request', 'N/A')}"
+        # Save to database via Service
+        # Note: submit_lead uses legacy lead table. If we want to use UserContact, we should use register_contact.
+        # But lead_form collects specific lead fields (request). 
+        # distinct from contact profile. So submit_lead is appropriate for now.
+        contact_str = f"{data.get('name', 'N/A')} | {data.get('contacts', 'N/A')}"
+        msg_str = f"Роль: {data.get('role', 'N/A')}\nКомпания: {data.get('company', 'N/A')}\nКоманда: {data.get('team_size', 'N/A')}\n\nЗапрос: {data.get('request', 'N/A')}"
+        
+        await user_service.submit_lead(
+            name=data.get('name', 'N/A'),
+            contact=data.get('contacts', 'N/A'),
+            message=msg_str
         )
+        
+        # Send to manager via Service
+        success = await notification_service.notify_new_lead(
+            name=data.get('name', 'N/A'),
+            contact=data.get('contacts', 'N/A'),
+            message=msg_str,
+            source="Bot Lead Form",
+            username=message.from_user.username,
+            user_id=message.from_user.id
+        )
+        
+        if success:
+            await message.answer(
+                "✅ **Спасибо! Ваша заявка отправлена.**\n\n"
+                f"Менеджер свяжется с вами в ближайшее время по указанным контактам:\n"
+                f"{data.get('contacts', 'не указаны')}",
+                parse_mode="Markdown"
+            )
+        else:
+             # Fallback if notification fails (though service usually logs error and returns False)
+             # But we generally shouldn't tell user it failed if DB save worked.
+             # However, if manager notification is critical, we might warn.
+             # Let's keep original behavior of showing success if DB worked, usually.
+             # But existing code showed error.
+             # Service returns bool.
+            await message.answer(
+                "✅ **Спасибо! Ваша заявка принята.**\n\n"
+                f"Менеджер свяжется с вами в ближайшее время.",
+                parse_mode="Markdown"
+            )
+
     except Exception as e:
-        logging.error(f"Failed to save lead to database: {e}")
-    
-    # Send to manager
-    success = await send_to_manager(message.bot, message.from_user, data)
-    
-    if success:
+        logging.error(f"Failed to process lead form: {e}")
         await message.answer(
-            "✅ **Спасибо! Ваша заявка отправлена.**\n\n"
-            f"Менеджер свяжется с вами в ближайшее время по указанным контактам:\n"
-            f"{data.get('contacts', 'не указаны')}",
-            parse_mode="Markdown"
-        )
-    else:
-        await message.answer(
-            "⚠️ Сейчас не получается отправить заявку менеджеру, попробуйте, пожалуйста, позже.\n\n"
-            "Или свяжитесь с нами напрямую:\n"
-            "📧 office@stalking.by\n"
-            "📞 +375 29 113 113 2\n"
-            "💬 @stalkermedia1",
-            parse_mode="Markdown"
+            "⚠️ Произошла ошибка при сохранении заявки.\n"
+            "Пожалуйста, попробуйте позже или напишите нам напрямую.",
+             parse_mode="Markdown"
         )
     
     # Clear state
@@ -165,37 +189,3 @@ async def cancel_lead_form(callback: CallbackQuery, state: FSMContext):
         "Если понадобится, вы всегда можете начать снова из главного меню.",
         parse_mode="Markdown"
     )
-
-
-async def send_to_manager(bot, user, data: dict) -> bool:
-    """Send lead to manager chat"""
-    if not settings.MANAGER_CHAT_ID:
-        logging.error("MANAGER_CHAT_ID is not set in environment variables")
-        return False
-    
-    # Format message for manager
-    username = f"@{user.username}" if user.username else "не указан"
-    
-    manager_message = (
-        "📩 **Новая заявка из бота \"Теремок\"**\n\n"
-        f"👤 **Имя:** {data.get('name', 'Не указано')}\n"
-        f"💼 **Роль:** {data.get('role', 'Не указано')}\n"
-        f"🏢 **Компания:** {data.get('company', 'Не указано')}\n"
-        f"👥 **Размер команды:** {data.get('team_size', 'Не указано')}\n"
-        f"📞 **Контакты:** {data.get('contacts', 'Не указано')}\n\n"
-        f"💬 **Запрос/ситуация:**\n{data.get('request', 'Не указано')}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        f"Данные из бота: {username} (ID: {user.id})"
-    )
-    
-    try:
-        await bot.send_message(
-            chat_id=settings.MANAGER_CHAT_ID,
-            text=manager_message,
-            parse_mode="Markdown"
-        )
-        logging.info(f"Lead sent to manager from user {user.id}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send lead to manager: {e}")
-        return False
