@@ -406,14 +406,16 @@
                         <td>{{ lead.team_size or '-' }}</td>
                         <td>{{ lead.phone }}</td>
                         <td>
-                            <span class="badge badge-{{ lead.status or 'new' }}"
-                                onclick="openModal({{ lead.user_id }}, '{{ lead.name }}', '{{ lead.status or 'new' }}', '{{ lead.notes or '' }}')">
+                            <span class="badge badge-{{ lead.status or 'new' }}" data-id="{{ lead.user_id }}"
+                                data-name="{{ lead.name }}" data-status="{{ lead.status or 'new' }}"
+                                data-notes="{{ lead.notes or '' }}" onclick="openModal(this)">
                                 {{ lead.status or 'new' }}
                             </span>
                         </td>
                         <td>
-                            <button class="btn btn-outline"
-                                onclick="openModal({{ lead.user_id }}, '{{ lead.name }}', '{{ lead.status or 'new' }}', '{{ lead.notes or '' }}')">✏️</button>
+                            <button class="btn btn-outline" data-id="{{ lead.user_id }}" data-name="{{ lead.name }}"
+                                data-status="{{ lead.status or 'new' }}" data-notes="{{ lead.notes or '' }}"
+                                onclick="openModal(this)">✏️</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -458,11 +460,11 @@
     <script>
         let currentUserId = null;
 
-        function openModal(userId, name, status, notes) {
-            currentUserId = userId;
-            document.getElementById('leadName').textContent = name;
-            document.getElementById('leadStatus').value = status;
-            document.getElementById('leadNotes').value = notes;
+        function openModal(element) {
+            currentUserId = element.dataset.id;
+            document.getElementById('leadName').textContent = element.dataset.name;
+            document.getElementById('leadStatus').value = element.dataset.status;
+            document.getElementById('leadNotes').value = element.dataset.notes;
             document.getElementById('editModal').classList.add('active');
         }
 

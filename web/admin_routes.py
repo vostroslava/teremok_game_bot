@@ -198,8 +198,7 @@ async def admin_settings(request: Request, key: str = None):
         "MANAGER_CHAT_ID": str(settings.MANAGER_CHAT_ID),
         "WEB_APP_URL": settings.WEB_APP_URL,
         "GOOGLE_SHEETS_ENABLED": settings.GOOGLE_SHEETS_ENABLED,
-        "GOOGLE_SHEETS_LEADS_ID": settings.GOOGLE_SHEETS_LEADS_ID[:20] + "..." if settings.GOOGLE_SHEETS_LEADS_ID else "-",
-        "GOOGLE_SHEETS_TESTS_ID": settings.GOOGLE_SHEETS_TESTS_ID[:20] + "..." if settings.GOOGLE_SHEETS_TESTS_ID else "-",
+        "GOOGLE_SHEETS_WEBHOOK_URL": settings.GOOGLE_SHEETS_WEBHOOK_URL[:30] + "..." if settings.GOOGLE_SHEETS_WEBHOOK_URL else "-",
         "CHECK_SUBSCRIPTION_ENABLED": settings.CHECK_SUBSCRIPTION_ENABLED,
     }
     
