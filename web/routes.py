@@ -1,14 +1,15 @@
 from fastapi import FastAPI, APIRouter, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from core.texts import TYPES_DATA
+from core.texts import TYPES_DATA, get_types_for_api
 from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result
 from core.config import settings
 from core.telegram_checks import is_subscribed_to_required_channel
 from core.logic import calculate_result, DIAGNOSTIC_QUESTIONS
 import os
 import logging
+import aiosqlite
 
 logger = logging.getLogger(__name__)
 
@@ -209,9 +210,16 @@ async def submit_test_results(request: Request):
         result_type = result['type']
         
         # Сохранение в БД
+        test_id = 0
         try:
-            await save_test_result(user_id, result_type, answers)
-            logger.info(f"Test result saved for user {user_id}: {result_type}")
+            test_id = await save_test_result(
+                user_id=user_id, 
+                result_type=result_type, 
+                answers=answers,
+                scores=result.get('scores', {}),
+                product='teremok'
+            )
+            logger.info(f"Test result saved for user {user_id}: {result_type} (ID: {test_id})")
         except Exception as e:
             logger.error(f"Failed to save test result: {e}")
         
@@ -230,34 +238,74 @@ async def submit_test_results(request: Request):
         
         # Экспорт в Google Sheets
         try:
+            # We add test_id just in case, though google sheets logic might not use it yet
             from core.google_sheets import export_test_to_sheets
             await export_test_to_sheets(
-                test={"user_id": user_id, "result_type": result_type, "scores": result.get('scores', {}), "product": "teremok"},
+                test={"user_id": user_id, "result_type": result_type, "scores": result.get('scores', {}), "product": "teremok", "test_id": test_id},
                 lead=contact
             )
         except Exception as e:
             logger.error(f"Failed to export test to sheets: {e}")
         
-        # Возвращаем результат пользователю
-        type_info = TYPES_DATA.get(result_type)
-        
         return JSONResponse({
             "status": "success",
-            "result": {
-                "type": result_type,
-                "scores": result.get('scores', {}),
-                "emoji": type_info.emoji if type_info else "",
-                "name": type_info.name_ru if type_info else result_type,
-                "description": type_info.short_desc if type_info else ""
-            }
+            "result_id": test_id,
         })
         
     except Exception as e:
-        logger.error(f"Failed to submit test results: {e}")
+        logger.error(f"Error in submit_test_results: {e}")
         return JSONResponse(
             {"status": "error", "message": str(e)},
             status_code=500
         )
+
+@router.get("/app/teremok/result/{result_id}", response_class=HTMLResponse)
+async def teremok_result_page(request: Request, result_id: int):
+    """Страница результата теста"""
+    try:
+        # Fetch result from DB
+        # We need a new detailed getter or just generic query
+        # Since we don't have get_test_result_by_id in db yet, let's look at available methods
+        # Or add a quick one right here or in db
+        async with aiosqlite.connect(settings.DB_NAME) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM test_results WHERE id = ?", (result_id,)) as cursor:
+                row = await cursor.fetchone()
+                
+        if not row:
+            return HTMLResponse("<h1>Результат не найден</h1>", status_code=404)
+            
+        result = dict(row)
+        
+        # Get detailed type info
+        type_info = TYPES_DATA.get(result['result_type'])
+        if not type_info:
+            # Fallback for unknown type
+            type_info = TYPES_DATA.get("bird") 
+            
+        # Parse scores if stored as string
+        scores = result['scores']
+        if isinstance(scores, str):
+            try:
+                import json
+                scores = json.loads(scores)
+            except:
+                scores = {}
+                
+        # Get types data for the chart
+        all_types = get_types_for_api()
+        
+        return templates.TemplateResponse("teremok/result.html", {
+            "request": request,
+            "result": result,
+            "type_info": type_info,
+            "scores": scores,
+            "all_types": all_types
+        })
+    except Exception as e:
+        logger.error(f"Error loading result page: {e}")
+        return HTMLResponse(f"<h1>Ошибка загрузки результата</h1><p>{str(e)}</p>", status_code=500)
+        
 
 
 async def send_test_notification_to_manager(bot, user_id: int, contact: dict, result_type: str, answers: dict):

@@ -897,53 +897,19 @@
 
                 const data = await res.json();
 
-                if (data.status === 'success') {
-                    showResult(data.result);
+                if (data.status === 'success' && data.result_id) {
+                    // Redirect to result page
+                    window.location.href = `/app/teremok/result/${data.result_id}`;
                 } else {
                     alert('Ошибка: ' + (data.message || 'Попробуйте позже'));
+                    // Restore test state if needed or reload
+                    window.location.reload();
                 }
             } catch (e) {
                 console.error('Submit error:', e);
                 alert('Ошибка соединения');
+                window.location.reload();
             }
-        }
-
-        // ===== Show Result =====
-        function showResult(result) {
-            const typeInfo = typesData[result.type] || {};
-
-            document.getElementById('resultEmoji').textContent = typeInfo.emoji || '🎯';
-            document.getElementById('resultType').textContent = typeInfo.name || result.type;
-            document.getElementById('resultSubtitle').textContent = typeInfo.short_desc || '';
-
-            // Strengths
-            const strengthsList = document.getElementById('strengthsList');
-            strengthsList.innerHTML = (typeInfo.strengths || [])
-                .map(s => `<li>${s}</li>`).join('');
-
-            // Risks
-            const risksList = document.getElementById('risksList');
-            risksList.innerHTML = (typeInfo.risks || [])
-                .map(r => `<li>${r}</li>`).join('');
-
-            // Tips
-            const tipsList = document.getElementById('tipsList');
-            tipsList.innerHTML = (typeInfo.management_tips || [])
-                .map(t => `<li>${t}</li>`).join('');
-
-            // Scores
-            const scoresGrid = document.getElementById('scoresGrid');
-            const allScores = result.scores || {};
-            scoresGrid.innerHTML = Object.entries(typesData)
-                .map(([id, info]) => `
-                    <div class="score-item">
-                        <div class="score-emoji">${info.emoji}</div>
-                        <div class="score-value">${allScores[id] || 0}</div>
-                        <div class="score-label">${info.name}</div>
-                    </div>
-                `).join('');
-
-            changeState('result');
         }
     </script>
 </body>
