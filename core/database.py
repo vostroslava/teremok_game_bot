@@ -1,6 +1,8 @@
 import aiosqlite
 import os
 import json
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from .config import settings
 
@@ -107,9 +109,50 @@ async def ensure_db_exists():
                 FOREIGN KEY (user_id) REFERENCES user_contacts(user_id)
             )
         """)
+
+        # Web Admins table (Login/Password)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS web_admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                session_token TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Migration: add session_token if not exists
+        try:
+            await db.execute("ALTER TABLE web_admins ADD COLUMN session_token TEXT")
+        except:
+            pass
+        
+        # Check if default admin exists, if not create one
+        # Default: admin / admin (Change immediately!)
+        try:
+             async with db.execute("SELECT 1 FROM web_admins") as cursor:
+                 if not await cursor.fetchone():
+                     salt = secrets.token_hex(16)
+                     pwd_hash = hashlib.sha256(("admin" + salt).encode()).hexdigest()
+                     await db.execute(
+                         "INSERT INTO web_admins (username, password_hash, salt) VALUES (?, ?, ?)",
+                         ("admin", pwd_hash, salt)
+                     )
+        except Exception:
+             pass
         
         # Migration: add table if upgrading
         # (Already handled by IF NOT EXISTS, effectively)
+
+        # ===== INDEXES (Optimization) =====
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_contacts_created ON user_contacts(created_at)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_contacts_status ON user_contacts(status)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON user_contacts(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tests_created ON test_results(created_at)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tests_user_id ON test_results(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tests_product ON test_results(product)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_formula_rsp_user ON formula_rsp_results(user_id)")
         
         await db.commit()
 
@@ -247,11 +290,58 @@ async def get_all_admins() -> list:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
+async def create_web_admin(username: str, password: str):
+    """Create a new web admin"""
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        await db.execute(
+            "INSERT INTO web_admins (username, password_hash, salt) VALUES (?, ?, ?)",
+            (username, password_hash, salt)
+        )
+        await db.commit()
+
+async def verify_web_admin(username: str, password: str) -> bool:
+    """Verify web admin credentials"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute(
+            "SELECT password_hash, salt FROM web_admins WHERE username = ?", 
+            (username,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return False
+            
+            stored_hash, salt = row
+            input_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+            return stored_hash == input_hash
+
+async def set_web_admin_session(username: str, token: str):
+    """Set session token for admin"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        await db.execute(
+            "UPDATE web_admins SET session_token = ? WHERE username = ?",
+            (token, username)
+        )
+        await db.commit()
+
+async def get_web_admin_by_token(token: str) -> str | None:
+    """Get username by session token"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute(
+            "SELECT username FROM web_admins WHERE session_token = ?", 
+            (token,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
 # ===== WEB ADMIN FUNCTIONS =====
 
 async def get_all_leads_full(limit: int = 100, status: str = None, 
-                              search: str = None, days: int = None) -> list:
-    """Get leads with full info, filters, and search"""
+                              search: str = None, days: int = None,
+                              sort_by: str = "created_at", sort_order: str = "desc") -> list:
+    """Get leads with full info, filters, search and sorting"""
     async with aiosqlite.connect(settings.DB_NAME) as db:
         db.row_factory = aiosqlite.Row
         
@@ -282,7 +372,22 @@ async def get_all_leads_full(limit: int = 100, status: str = None,
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         
-        query += " ORDER BY c.created_at DESC LIMIT ?"
+        # Sorting whitelist
+        sort_columns = {
+            "created_at": "c.created_at",
+            "updated_at": "c.updated_at",
+            "status": "c.status",
+            "name": "c.name",
+            "company": "c.company",
+            "role": "c.role",
+            "product": "c.product",
+            "team_size": "c.team_size"
+        }
+        
+        sort_col = sort_columns.get(sort_by, "c.created_at")
+        order = "ASC" if sort_order and sort_order.lower() == "asc" else "DESC"
+        
+        query += f" ORDER BY {sort_col} {order} LIMIT ?"
         params.append(limit)
         
         async with db.execute(query, params) as cursor:
@@ -290,8 +395,9 @@ async def get_all_leads_full(limit: int = 100, status: str = None,
             return [dict(row) for row in rows]
 
 async def get_all_tests_full(limit: int = 100, product: str = None,
-                              result_type: str = None, days: int = None) -> list:
-    """Get test results with contact info"""
+                              result_type: str = None, days: int = None,
+                              sort_by: str = "created_at", sort_order: str = "desc") -> list:
+    """Get test results with contact info and sorting"""
     async with aiosqlite.connect(settings.DB_NAME) as db:
         db.row_factory = aiosqlite.Row
         
@@ -319,8 +425,21 @@ async def get_all_tests_full(limit: int = 100, product: str = None,
         
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
+            
+        # Sorting whitelist
+        sort_columns = {
+            "created_at": "t.created_at",
+            "result_type": "t.result_type",
+            "product": "t.product",
+            "name": "c.name",
+            "company": "c.company",
+            "role": "c.role"
+        }
         
-        query += " ORDER BY t.created_at DESC LIMIT ?"
+        sort_col = sort_columns.get(sort_by, "t.created_at")
+        order = "ASC" if sort_order and sort_order.lower() == "asc" else "DESC"
+        
+        query += f" ORDER BY {sort_col} {order} LIMIT ?"
         params.append(limit)
         
         async with db.execute(query, params) as cursor:

@@ -3,17 +3,35 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from core.texts import TYPES_DATA, get_types_for_api
-from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result
+from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result # Legacy imports to be replaced
 from core.config import settings
 from core.telegram_checks import is_subscribed_to_required_channel
 from core.logic import calculate_result, DIAGNOSTIC_QUESTIONS
 import os
 import logging
 import aiosqlite
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from core.limiter import limiter
+
+# Services
+from repositories.user_repository import UserRepository
+from repositories.test_repository import TestRepository
+from services.user_service import UserService
+from services.test_service import TestService
+from models.user import UserContact
 
 logger = logging.getLogger(__name__)
 
+# Service Instantiation
+user_repo = UserRepository()
+test_repo = TestRepository()
+user_service = UserService(user_repo)
+test_service = TestService(test_repo)
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 router = APIRouter()
 
 # Jinja2 templates for new app pages
@@ -74,7 +92,7 @@ async def check_subscription(user_id: int):
     is_subscribed = await is_subscribed_to_required_channel(bot_instance, user_id)
     
     # Проверяем наличие контактов в БД
-    user_has_contact = await has_contact(user_id)
+    user_has_contact = await user_service.has_contact(user_id)
     
     return JSONResponse({
         "subscribed": is_subscribed,
@@ -84,6 +102,7 @@ async def check_subscription(user_id: int):
 
 # ==== NEW: Save contacts endpoint ====
 @router.post("/api/contacts")
+@limiter.limit("5/minute")
 async def save_user_contacts(request: Request):
     """
     Сохранение контактных данных пользователя и отправка уведомления менеджеру
@@ -102,19 +121,23 @@ async def save_user_contacts(request: Request):
     """
     try:
         data = await request.json()
-        user_id = data['user_id']
+        user_id = int(data['user_id'])
         product = data.get('product', 'teremok')
         
-        await save_contact(
+        # Create contact model
+        contact = UserContact(
             user_id=user_id,
             name=data['name'],
             role=data['role'],
             company=data.get('company', ''),
             team_size=data['team_size'],
             phone=data['phone'],
-            telegram_username=data.get('username')
+            telegram_username=data.get('username'),
+            product=product
         )
         
+        # Save via service
+        await user_service.register_contact(contact)
         logger.info(f"Contacts saved for user {user_id}")
         
         # Отправляем короткое уведомление менеджеру
@@ -128,18 +151,10 @@ async def save_user_contacts(request: Request):
             except Exception as e:
                 logger.error(f"Failed to send notification: {e}")
         
-        # Экспорт в Google Sheets
+        # Export to Google Sheets
         try:
             from core.google_sheets import export_lead_to_sheets
-            await export_lead_to_sheets({
-                "user_id": user_id,
-                "name": data['name'],
-                "role": data['role'],
-                "company": data.get('company', ''),
-                "team_size": data['team_size'],
-                "phone": data['phone'],
-                "telegram_username": data.get('username')
-            })
+            await export_lead_to_sheets(contact.__dict__)
         except Exception as e:
             logger.error(f"Failed to export lead to sheets: {e}")
         
@@ -190,6 +205,7 @@ async def send_contact_notification_to_manager(bot, user_id: int, data: dict, pr
 
 # ==== NEW: Submit test results endpoint ====
 @router.post("/api/test/submit")
+@limiter.limit("10/minute")
 async def submit_test_results(request: Request):
     """
     Сохранение результатов теста и отправка уведомления менеджеру
@@ -205,26 +221,20 @@ async def submit_test_results(request: Request):
         user_id = data['user_id']
         answers = data['answers']
         
-        # Подсчёт результата
-        result = calculate_result(answers)
-        result_type = result['type']
+        # Process via service
+        test_id = await test_service.process_teremok_test(user_id, answers)
         
-        # Сохранение в БД
-        test_id = 0
-        try:
-            test_id = await save_test_result(
-                user_id=user_id, 
-                result_type=result_type, 
-                answers=answers,
-                scores=result.get('scores', {}),
-                product='teremok'
-            )
-            logger.info(f"Test result saved for user {user_id}: {result_type} (ID: {test_id})")
-        except Exception as e:
-            logger.error(f"Failed to save test result: {e}")
+        # Get result type for response/notification (Need to recalculate or fetch, 
+        # but service returns ID. Let's optimize service later or re-calc here briefly for notification)
+        # Actually Service creates result, we can just peek answers or fetch result.
+        # For now, let's keep fast calc here for notification context
+        result_calc = calculate_result(answers)
+        result_type = result_calc['type']
+        
+        logger.info(f"Test result saved for user {user_id}: {result_type} (ID: {test_id})")
         
         # Получаем контакты (если есть)
-        contact = await get_contact(user_id)
+        contact = await user_service.get_contact(user_id)
         
         # Отправляем уведомление менеджеру только если включено
         if settings.SEND_NOTIFICATIONS and bot_instance and settings.MANAGER_CHAT_ID:
@@ -461,6 +471,7 @@ async def get_formula_rsp_questions():
     return JSONResponse({"questions": FORMULA_RSP_QUESTIONS})
 
 @app.post("/api/formula/rsp/submit")
+@limiter.limit("5/minute")
 async def submit_formula_rsp_results(request: Request):
     try:
         data = await request.json()
@@ -478,26 +489,30 @@ async def submit_formula_rsp_results(request: Request):
                  import random
                  user_id = random.randint(1000000, 9999999)
         
-        # Ensure contact exists (Guest or Subscribed)
-        from core.database import has_contact, save_contact, get_contact
+        if not user_id: 
+                 import random
+                 user_id = random.randint(1000000, 9999999)
         
-        user_has_contact = await has_contact(user_id)
+        # Ensure contact exists (Guest or Subscribed)
+        user_has_contact = await user_service.has_contact(user_id)
         
         # If we have explicit Name/Role in payload (from Form), update/save contact
         if name and role:
-             await save_contact(
+             contact = UserContact(
                 user_id=user_id,
                 name=name,
                 role=role,
-                company="", # We might not catch company in this payload if simplified form
+                company="", 
                 team_size="",
                 phone="",
                 telegram_username=None,
                 product="formula_rsp"
-            )
+             )
+             await user_service.register_contact(contact)
+             
         elif not user_has_contact:
             # No contact and no payload -> Create guest
-             await save_contact(
+             contact = UserContact(
                 user_id=user_id,
                 name="Guest User",
                 role="Guest",
@@ -506,42 +521,30 @@ async def submit_formula_rsp_results(request: Request):
                 phone="",
                 telegram_username=None,
                 product="formula_rsp"
-            )
+             )
+             await user_service.register_contact(contact)
 
-        # Calculate result
-        from core.formula_rsp_logic import compute_formula_rsp
-        result = compute_formula_rsp(answers)
+        # Calculate and Save Result via Service
+        result_obj = await test_service.process_formula_rsp(user_id, answers)
+        test_id = result_obj.id
         
-        # Save to DB (New table)
-        from core.database import save_formula_rsp_result
-        
-        test_id = await save_formula_rsp_result(
-            user_id=user_id,
-            primary_code=result.primary_code,
-            primary_name=result.primary_name,
-            scores=result.scores,
-            answers=answers
-        )
-        
-        logger.info(f"Formula RSP result saved for {user_id}: {result.primary_code} (ID: {test_id})")
+        logger.info(f"Formula RSP result saved for {user_id}: {result_obj.primary_code} (ID: {test_id})")
         
         # Export to Google Sheets
-        contact = await get_contact(user_id)
+        contact = await user_service.get_contact(user_id)
         try:
             from core.google_sheets import export_test_to_sheets
-            # Adapt export function to handle RSP structure
-            # We'll pass scores dict directly
             await export_test_to_sheets(
                 test={
                     "user_id": user_id, 
-                    "result_type": result.primary_name,
-                    "scores": result.scores,
+                    "result_type": result_obj.primary_type_name,
+                    "scores": result_obj.scores,
                     "product": "formula_rsp",
                     "test_id": test_id,
                     "name": name,
                     "role": role 
                 },
-                lead=contact
+                lead=contact.__dict__ if contact else None
             )
         except Exception as e:
             logger.error(f"Failed to export Formula RSP to sheets: {e}")
@@ -551,13 +554,13 @@ async def submit_formula_rsp_results(request: Request):
             "status": "success",
             "result": {
                 "id": test_id,
-                "primary_code": result.primary_code,
-                "primary_name": result.primary_name,
-                "secondary_codes": result.secondary_codes,
-                "scores": result.scores,
-                "description": result.description,
-                "recommendations": result.recommendations,
-                "emoji": result.emoji
+                "primary_code": result_obj.primary_code,
+                "primary_name": result_obj.primary_type_name,
+                "secondary_codes": result_obj.secondary_codes,
+                "scores": result_obj.scores,
+                "description": result_obj.description,
+                "recommendations": result_obj.recommendations,
+                "emoji": result_obj.emoji
             }
         })
 

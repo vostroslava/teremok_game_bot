@@ -2,16 +2,24 @@
 Web Admin Panel Routes
 Protected by ADMIN_PANEL_SECRET
 """
-from fastapi import APIRouter, Request, Query, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Request, Query, Depends, Form
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from core.config import settings
-from core import database as db
+from core.database import get_stats, get_recent_leads, get_recent_tests, get_all_leads_full, get_all_tests_full # Legacy for stats
 from core.texts import TYPES_DATA
+from repositories.user_repository import UserRepository
+from services.auth_service import AuthService
+from services.user_service import UserService
 import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Dependecy Injection (Module Level for simplicity)
+user_repo = UserRepository()
+auth_service = AuthService(user_repo)
+user_service = UserService(user_repo)
 
 router = APIRouter(prefix="/app/admin", tags=["admin"])
 
@@ -21,14 +29,24 @@ templates = Jinja2Templates(directory=templates_path)
 
 # ===== AUTH MIDDLEWARE =====
 
-def verify_admin_key(request: Request) -> bool:
-    """Check if request has valid admin key"""
-    # Check query param
+import secrets
+
+# ===== AUTH MIDDLEWARE =====
+
+async def verify_admin_auth(request: Request) -> bool:
+    """Check if request has valid session or legacy key"""
+    # 1. Check session token
+    token = request.cookies.get("admin_session")
+    if token:
+        user = await auth_service.get_user_from_token(token)
+        if user:
+            return True
+            
+    # 2. Legacy: Check query param or cookie key
     key = request.query_params.get("key")
     if key and key == settings.ADMIN_PANEL_SECRET:
         return True
     
-    # Check cookie
     cookie_key = request.cookies.get("admin_key")
     if cookie_key and cookie_key == settings.ADMIN_PANEL_SECRET:
         return True
@@ -76,30 +94,60 @@ def get_access_denied_response(request: Request) -> HTMLResponse:
     """
     return HTMLResponse(content=html, status_code=403)
 
+
+
+# ===== LOGIN/LOGOUT =====
+
+@router.get("/login")
+async def login_page(request: Request):
+    """Admin login page"""
+    if await verify_admin_auth(request):
+        return RedirectResponse(url="/app/admin/dashboard", status_code=303)
+    return templates.TemplateResponse("admin/login.html", {"request": request})
+
+@router.post("/login")
+async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    """Handle login submission"""
+    if await auth_service.verify_password(username, password):
+        # Create session
+        token = await auth_service.create_session(username)
+        
+        response = RedirectResponse(url="/app/admin/dashboard", status_code=303)
+        response.set_cookie("admin_session", token, max_age=86400*7, httponly=True, samesite="lax")
+        return response
+        
+    return templates.TemplateResponse("admin/login.html", {
+        "request": request, 
+        "error": "Неверный логин или пароль"
+    })
+
+@router.get("/logout")
+async def logout(request: Request):
+    """Logout"""
+    response = RedirectResponse(url="/app/admin/login", status_code=303)
+    response.delete_cookie("admin_session")
+    response.delete_cookie("admin_key")
+    return response
+
 # ===== DASHBOARD =====
 
 @router.get("")
-@router.get("/")
+@router.get("/dashboard")
 async def admin_dashboard(request: Request, key: str = None):
-    """Main admin dashboard"""
-    if not verify_admin_key(request):
-        return get_access_denied_response(request)
+    """Admin dashboard overview"""
+    if not await verify_admin_auth(request):
+        return RedirectResponse(url="/app/admin/login", status_code=303)
     
     logger.info(f"Admin dashboard accessed from {request.client.host}")
     
     # Get stats
-    stats = await db.get_stats()
-    recent_leads = await db.get_recent_leads(10)
-    recent_tests = await db.get_recent_tests(10)
+    stats = await get_stats()
     
-    # Add type info to tests
-    for test in recent_tests:
-        type_info = TYPES_DATA.get(test.get('result_type'))
-        if type_info:
-            test['type_emoji'] = type_info.emoji
-            test['type_name'] = type_info.name_ru
+    # Get recent activity
+    recent_leads = await get_recent_leads(limit=5)
+    recent_tests = await get_recent_tests(limit=5)
     
-    response = templates.TemplateResponse("admin/dashboard.html", {
+    return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "stats": stats,
         "recent_leads": recent_leads,
@@ -119,19 +167,26 @@ async def admin_dashboard(request: Request, key: str = None):
 async def admin_leads(request: Request, 
                       status: str = "all",
                       search: str = "",
-                      days: int = None,
+                      days: str = None,
+                      sort_by: str = "created_at",
+                      sort_order: str = "desc",
                       key: str = None):
     """Leads management page"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return get_access_denied_response(request)
     
     logger.info(f"Admin leads accessed, status={status}, search={search}")
     
-    leads = await db.get_all_leads_full(
+    # Safely parse days
+    days_val = int(days) if days and days.isdigit() else None
+
+    leads = await get_all_leads_full(
         limit=200,
         status=status if status != "all" else None,
         search=search if search else None,
-        days=days
+        days=days_val,
+        sort_by=sort_by,
+        sort_order=sort_order
     )
     
     return templates.TemplateResponse("admin/leads.html", {
@@ -140,6 +195,8 @@ async def admin_leads(request: Request,
         "current_status": status,
         "current_search": search,
         "current_days": days,
+        "current_sort_by": sort_by,
+        "current_sort_order": sort_order,
         "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
     })
 
@@ -149,19 +206,26 @@ async def admin_leads(request: Request,
 async def admin_tests(request: Request,
                       product: str = "all",
                       result_type: str = "all",
-                      days: int = None,
+                      days: str = None,
+                      sort_by: str = "created_at",
+                      sort_order: str = "desc",
                       key: str = None):
     """Test results management page"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return get_access_denied_response(request)
     
     logger.info(f"Admin tests accessed, product={product}, result_type={result_type}")
     
-    tests = await db.get_all_tests_full(
+    # Safely parse days
+    days_val = int(days) if days and days.isdigit() else None
+
+    tests = await get_all_tests_full(
         limit=200,
         product=product if product != "all" else None,
         result_type=result_type if result_type != "all" else None,
-        days=days
+        days=days_val,
+        sort_by=sort_by,
+        sort_order=sort_order
     )
     
     # Add type info
@@ -182,6 +246,8 @@ async def admin_tests(request: Request,
         "current_product": product,
         "current_type": result_type,
         "current_days": days,
+        "current_sort_by": sort_by,
+        "current_sort_order": sort_order,
         "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
     })
 
@@ -190,7 +256,7 @@ async def admin_tests(request: Request,
 @router.get("/settings")
 async def admin_settings(request: Request, key: str = None):
     """Settings page (read-only)"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return get_access_denied_response(request)
     
     config = {
@@ -213,14 +279,14 @@ async def admin_settings(request: Request, key: str = None):
 @router.post("/api/lead/{user_id}/status")
 async def update_lead_status(request: Request, user_id: int):
     """Update lead status and notes"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return JSONResponse({"error": "Unauthorized"}, status_code=403)
     
     data = await request.json()
     status = data.get("status", "new")
     notes = data.get("notes")
     
-    await db.update_lead_status(user_id, status, notes)
+    await user_service.update_lead_status(user_id, status, notes)
     logger.info(f"Lead {user_id} status updated to {status}")
     
     return JSONResponse({"status": "ok"})
@@ -228,7 +294,7 @@ async def update_lead_status(request: Request, user_id: int):
 @router.post("/api/export/leads")
 async def export_leads_to_sheets(request: Request):
     """Export all leads to Google Sheets"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return JSONResponse({"error": "Unauthorized"}, status_code=403)
     
     if not settings.GOOGLE_SHEETS_ENABLED:
@@ -237,7 +303,7 @@ async def export_leads_to_sheets(request: Request):
     try:
         from core.google_sheets import send_to_sheets
         
-        leads = await db.get_all_leads_full(limit=10000)
+        leads = await get_all_leads_full(limit=10000)
         
         # Prepare all data first
         all_data = []
@@ -272,7 +338,7 @@ async def export_leads_to_sheets(request: Request):
 @router.post("/api/export/tests")
 async def export_tests_to_sheets(request: Request):
     """Export all tests to Google Sheets"""
-    if not verify_admin_key(request):
+    if not await verify_admin_auth(request):
         return JSONResponse({"error": "Unauthorized"}, status_code=403)
     
     if not settings.GOOGLE_SHEETS_ENABLED:
@@ -282,7 +348,7 @@ async def export_tests_to_sheets(request: Request):
         from core.google_sheets import send_to_sheets
         import json
         
-        tests = await db.get_all_tests_full(limit=10000)
+        tests = await get_all_tests_full(limit=10000)
         
         all_data = []
         for test in tests:

@@ -244,6 +244,8 @@
         <div class="filters">
             <form method="get" action="/app/admin/tests" style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+                <input type="hidden" name="sort_order" value="{{ current_sort_order }}">
 
                 <select name="product" class="filter-select">
                     <option value="all" {% if current_product=='all' %}selected{% endif %}>Все продукты</option>
@@ -278,12 +280,60 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Дата</th>
-                        <th>Имя</th>
-                        <th>Роль</th>
-                        <th>Компания</th>
-                        <th>Типаж</th>
-                        <th>Продукт</th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=created_at&sort_order={{ 'asc' if current_sort_by == 'created_at' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Дата
+                                {% if current_sort_by == 'created_at' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=name&sort_order={{ 'asc' if current_sort_by == 'name' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Имя
+                                {% if current_sort_by == 'name' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=role&sort_order={{ 'asc' if current_sort_by == 'role' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Роль
+                                {% if current_sort_by == 'role' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=company&sort_order={{ 'asc' if current_sort_by == 'company' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Компания
+                                {% if current_sort_by == 'company' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=result_type&sort_order={{ 'asc' if current_sort_by == 'result_type' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Типаж
+                                {% if current_sort_by == 'result_type' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?product={{ current_product }}&result_type={{ current_type }}&days={{ current_days }}&sort_by=product&sort_order={{ 'asc' if current_sort_by == 'product' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Продукт
+                                {% if current_sort_by == 'product' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
                         <th>Баллы</th>
                     </tr>
                 </thead>

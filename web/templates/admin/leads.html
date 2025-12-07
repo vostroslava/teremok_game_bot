@@ -355,6 +355,8 @@
         <div class="filters">
             <form method="get" action="/app/admin/leads" style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+                <input type="hidden" name="sort_order" value="{{ current_sort_order }}">
 
                 <input type="text" name="search" class="filter-input" placeholder="🔍 Поиск..."
                     value="{{ current_search or '' }}">
@@ -386,13 +388,61 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Дата</th>
-                        <th>Имя</th>
-                        <th>Роль</th>
-                        <th>Компания</th>
-                        <th>Команда</th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=created_at&sort_order={{ 'asc' if current_sort_by == 'created_at' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Дата
+                                {% if current_sort_by == 'created_at' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=name&sort_order={{ 'asc' if current_sort_by == 'name' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Имя
+                                {% if current_sort_by == 'name' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=role&sort_order={{ 'asc' if current_sort_by == 'role' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Роль
+                                {% if current_sort_by == 'role' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=company&sort_order={{ 'asc' if current_sort_by == 'company' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Компания
+                                {% if current_sort_by == 'company' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=team_size&sort_order={{ 'asc' if current_sort_by == 'team_size' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Команда
+                                {% if current_sort_by == 'team_size' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
                         <th>Телефон</th>
-                        <th>Статус</th>
+                        <th>
+                            <a href="?status={{ current_status }}&search={{ current_search }}&days={{ current_days }}&sort_by=status&sort_order={{ 'asc' if current_sort_by == 'status' and current_sort_order == 'desc' else 'desc' }}&key={{ key }}"
+                                style="color: inherit; text-decoration: none;">
+                                Статус
+                                {% if current_sort_by == 'status' %}
+                                {{ '↑' if current_sort_order == 'asc' else '↓' }}
+                                {% endif %}
+                            </a>
+                        </th>
                         <th>Действия</th>
                     </tr>
                 </thead>
