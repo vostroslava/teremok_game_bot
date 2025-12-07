@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Результат диагностики</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --orange: #f97316;
+            --red: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, #302b63 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Score Badge */
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 4px solid var(--muted);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .score-val {
+            font-size: 2.5rem;
+            font-weight: 800;
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-top: -5px;
+        }
+
+        /* Result Card */
+        .result-card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .level-name {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff, #e0e7ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .level-emoji {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .level-desc {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #d1d5db;
+            margin-bottom: 20px;
+        }
+
+        /* Color Themes */
+        .theme-green .score-circle {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .theme-green .level-name {
+            background: var(--green);
+            -webkit-background-clip: text;
+        }
+
+        .theme-yellow .score-circle {
+            border-color: var(--yellow);
+            color: var(--yellow);
+        }
+
+        .theme-yellow .level-name {
+            background: var(--yellow);
+            -webkit-background-clip: text;
+        }
+
+        .theme-orange .score-circle {
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .theme-orange .level-name {
+            background: var(--orange);
+            -webkit-background-clip: text;
+        }
+
+        .theme-red .score-circle {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .theme-red .level-name {
+            background: var(--red);
+            -webkit-background-clip: text;
+        }
+
+        /* Recommendations */
+        .rec-section {
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .rec-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rec-list {
+            list-style: none;
+        }
+
+        .rec-list li {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid var(--muted);
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 0 10px 10px 0;
+            font-size: 0.95rem;
+        }
+
+        .theme-green .rec-list li {
+            border-color: var(--green);
+        }
+
+        .theme-yellow .rec-list li {
+            border-color: var(--yellow);
+        }
+
+        .theme-orange .rec-list li {
+            border-color: var(--orange);
+        }
+
+        .theme-red .rec-list li {
+            border-color: var(--red);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border-radius: 14px;
+            text-align: center;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .result-id {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body class="theme-{{ level.code }}">
+    <div class="container">
+
+        <div class="score-circle">
+            <span class="score-val">{{ total_score }}</span>
+            <span class="score-label">Баллов</span>
+        </div>
+
+        <div class="result-card">
+            <span class="level-emoji">{{ level.emoji }}</span>
+            <div class="level-name">{{ level.name }}</div>
+            <div class="level-desc">
+                {{ level.short_description }}
+            </div>
+
+            <div class="rec-section">
+                <div class="rec-title">💡 Рекомендации</div>
+                <ul class="rec-list">
+                    {% for rec in level.recommendations %}
+                    <li>{{ rec }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="result-id">ID результата: {{ test_id }}</div>
+        </div>
+
+        <div class="btn-group">
+            <a href="/app/formula/self_test" class="btn btn-primary">Проверить ещё одного</a>
+            <a href="/app/hub" class="btn btn-secondary">В меню</a>
+        </div>
+
+    </div>
+
+    <script>
+        window.Telegram?.WebApp?.expand();
+    </script>
+</body>
+
+</html>

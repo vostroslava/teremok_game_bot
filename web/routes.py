@@ -435,14 +435,175 @@ async def teremok_types_overview(request: Request):
 async def teremok_cases(request: Request):
     return templates.TemplateResponse("teremok/cases.html", {"request": request})
 
-# Formula section
-@app.get("/app/formula/overview")
-async def formula_overview(request: Request):
-    return templates.TemplateResponse("formula/overview.html", {"request": request})
+# ==== NEW: Formula Module Routes ====
 
+# API: Get questions
+@router.get("/api/formula/questions")
+async def get_formula_questions():
+    from core.formula_logic import FORMULA_QUESTIONS, FORMULA_OPTIONS
+    questions = [
+        {
+            "id": q.id,
+            "text": q.text,
+            "options": FORMULA_OPTIONS
+        }
+        for q in FORMULA_QUESTIONS
+    ]
+    return {"questions": questions, "total": len(questions)}
+
+# API: Submit result
+@router.post("/api/formula/submit")
+async def submit_formula_results(request: Request):
+    """
+    Submit Formula test results.
+    Expected JSON:
+    {
+        "employee_name": "str",
+        "employee_role": "str",
+        "answers": [1, 2, 4, ...], # list of scores
+        "user_id": int
+    }
+    """
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        name = data.get('employee_name')
+        role = data.get('employee_role')
+        answers = data.get('answers') # List of scores
+        
+        if not user_id or not answers:
+            return JSONResponse({"status": "error", "message": "Missing required fields"}, status_code=400)
+
+        # Calculate result
+        from core.formula_logic import compute_formula_level
+        result = compute_formula_level(answers)
+        
+        # Prepare "answers" dict for DB storage (fake question ids)
+        # We store just the scores list in "scores" column usually, but let's follow pattern
+        answers_dict = {str(i+1): score for i, score in enumerate(answers)}
+        
+        # Save to DB
+        test_id = await save_test_result(
+            user_id=user_id,
+            result_type=result.level.code,
+            answers=answers_dict,
+            scores={"total": result.total_score, "level": result.level.code}, # Store simple score metadata
+            product='formula'
+        )
+        logger.info(f"Formula result saved for user {user_id}: {result.level.code} (ID: {test_id})")
+        
+        # Get user contact for export
+        contact = await get_contact(user_id)
+        
+        # Export to Google Sheets
+        try:
+            from core.google_sheets import export_test_to_sheets
+            # Override contact info with employee info for this specific test entry if needed, 
+            # OR just pass the employee info in the test data. 
+            # The sheet logic takes name/role from lead if present, or test if present.
+            # Let's verify existing logic: export_test_to_sheets checks lead first.
+            # But here we are testing an EMPLOYEE, not the user themselves. 
+            # Ideally we want to see "Employee Name" in the sheet.
+            # Let's pass it in the test dict which will be mapped.
+            
+            await export_test_to_sheets(
+                test={
+                    "user_id": user_id, 
+                    "result_type": result.level.name, # Use readable name
+                    "scores": {"total": result.total_score}, 
+                    "product": "formula", 
+                    "test_id": test_id,
+                    "name": name, # Explicitly pass employee name
+                    "role": role  # Explicitly pass employee role
+                },
+                lead=contact # We still pass lead to link it to the account
+            )
+        except Exception as e:
+            logger.error(f"Failed to export Formula test to sheets: {e}")
+
+        # Return result
+        return JSONResponse({
+            "status": "success",
+            "result": {
+                "id": test_id,
+                "total_score": result.total_score,
+                "level_code": result.level.code,
+                "level_name": result.level.name,
+                "short_description": result.level.short_description,
+                "recommendations": result.level.recommendations,
+                "emoji": result.level.emoji
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error in submit_formula_results: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+# Pages
+@app.get("/app/formula/overview")
+async def formula_overview_page_redirect(request: Request):
+    # This was a placeholder, redirecting to info or using new template
+    return RedirectResponse(url="/app/formula/info")
+
+@app.get("/app/formula/info")
+async def formula_info_page(request: Request):
+    from core.formula_levels import FORMULA_LEVELS
+    return templates.TemplateResponse("formula/info.html", {
+        "request": request,
+        "levels": FORMULA_LEVELS
+    })
+
+@app.get("/app/formula/self_test")
+async def formula_self_test_page(request: Request):
+    return templates.TemplateResponse("formula/self_test.html", {"request": request})
+
+@app.get("/app/formula/result/{test_id}")
+async def formula_result_page(request: Request, test_id: int):
+    try:
+        async with aiosqlite.connect(settings.DB_NAME) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM test_results WHERE id = ?", (test_id,)) as cursor:
+                row = await cursor.fetchone()
+        
+        if not row:
+            return HTMLResponse("<h1>Результат не найден</h1>", status_code=404)
+            
+        row_dict = dict(row)
+        
+        # Reconstruct level data
+        from core.formula_levels import FORMULA_LEVELS
+        level_code = row_dict['result_type']
+        level = FORMULA_LEVELS.get(level_code)
+        
+        # Clean up fallback if needed
+        if not level:
+             level = FORMULA_LEVELS.get('green') # fallback
+             
+        # Parse scores if needed
+        import json
+        try:
+             scores_data = json.loads(row_dict['scores']) if isinstance(row_dict['scores'], str) else row_dict['scores']
+             total_score = scores_data.get('total', 0)
+        except:
+             total_score = 0
+             
+        return templates.TemplateResponse("formula/result.html", {
+            "request": request,
+            "level": level,
+            "total_score": total_score,
+            "test_id": test_id
+        })
+            
+    except Exception as e:
+        logger.error(f"Error loading Formula result page: {e}")
+        return HTMLResponse(f"<h1>Ошибка загрузки</h1><p>{e}</p>", status_code=500)
+
+
+# Formula section placeholders (kept or redirected)
 @app.get("/app/formula/team_quiz")
 async def formula_team_quiz(request: Request):
-    return templates.TemplateResponse("formula/team_quiz.html", {"request": request})
+    return RedirectResponse(url="/app/formula/self_test")
 
 @app.get("/app/formula/matrix")
 async def formula_matrix(request: Request):
