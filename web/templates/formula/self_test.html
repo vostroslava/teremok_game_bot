@@ -260,6 +260,11 @@
         // Load data
         async function init() {
             try {
+                if (tg) {
+                    tg.ready();
+                    tg.expand();
+                }
+
                 // 1. Check contact (if strictly required) - for now skipped, assuming user allows flow
                 // But user requested reuse of contact logic. 
                 // Let's optimize: we let them fill the test, and on submit if no contact, we ask for it?
@@ -267,11 +272,12 @@
 
                 // Let's load questions first
                 const res = await fetch('/api/formula/questions');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
                 questions = data.questions;
                 renderQuestions();
             } catch (e) {
-                alert('Ошибка загрузки данных: ' + e);
+                alert('Ошибка загрузки данных: ' + e.message);
             }
         }
 
@@ -328,6 +334,11 @@
             document.getElementById('loader').classList.remove('hidden');
 
             try {
+                // Debug: alert if userId is 0 and we are inside TG
+                // if (window.Telegram?.WebApp?.initData && userId === 0) {
+                //     alert("Внимание: Не удалось определить ID пользователя Telegram.");
+                // }
+
                 const res = await fetch('/api/formula/submit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -339,6 +350,10 @@
                     })
                 });
 
+                if (!res.ok) {
+                    throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+                }
+
                 const resultData = await res.json();
 
                 if (resultData.status === 'success') {
@@ -346,12 +361,13 @@
                     const testId = resultData.result.id;
                     window.location.href = `/app/formula/result/${testId}`;
                 } else {
-                    alert("Ошибка: " + resultData.message);
+                    alert("Ошибка: " + (resultData.message || "Неизвестная ошибка"));
                     document.getElementById('loader').classList.add('hidden');
                 }
 
             } catch (e) {
-                alert("Ошибка сети: " + e);
+                alert("Ошибка отправки: " + e.message);
+                console.error(e);
                 document.getElementById('loader').classList.add('hidden');
             }
         }
