@@ -36,18 +36,28 @@ async def get_types():
 @router.get("/api/check-subscription")
 async def check_subscription(user_id: int):
     """
-    Проверяет подписку пользователя на обязательный канал
+    Проверяет подписку пользователя на обязательный канал и наличие контактов
     
     Query params:
         user_id: Telegram user_id
+    
+    Returns:
+        subscribed: bool - подписан ли на канал
+        has_contact: bool - оставлены ли контакты ранее
+        channel_username: str - username канала
     """
     if not bot_instance:
-        return JSONResponse({"subscribed": False, "error": "Bot not initialized"})
+        return JSONResponse({"subscribed": False, "has_contact": False, "error": "Bot not initialized"})
     
+    # Проверяем подписку на канал
     is_subscribed = await is_subscribed_to_required_channel(bot_instance, user_id)
+    
+    # Проверяем наличие контактов в БД
+    user_has_contact = await has_contact(user_id)
     
     return JSONResponse({
         "subscribed": is_subscribed,
+        "has_contact": user_has_contact,
         "channel_username": settings.REQUIRED_CHANNEL_USERNAME
     })
 
@@ -55,7 +65,7 @@ async def check_subscription(user_id: int):
 @router.post("/api/contacts")
 async def save_user_contacts(request: Request):
     """
-    Сохранение контактных данных пользователя
+    Сохранение контактных данных пользователя и отправка уведомления менеджеру
     
     Expected JSON:
         {
@@ -65,14 +75,17 @@ async def save_user_contacts(request: Request):
             "company": str,
             "team_size": str,
             "phone": str,
-            "username": str (optional)
+            "username": str (optional),
+            "product": str (optional, default "teremok")
         }
     """
     try:
         data = await request.json()
+        user_id = data['user_id']
+        product = data.get('product', 'teremok')
         
         await save_contact(
-            user_id=data['user_id'],
+            user_id=user_id,
             name=data['name'],
             role=data['role'],
             company=data.get('company', ''),
@@ -81,9 +94,21 @@ async def save_user_contacts(request: Request):
             telegram_username=data.get('username')
         )
         
-        logger.info(f"Contacts saved for user {data['user_id']}")
+        logger.info(f"Contacts saved for user {user_id}")
         
-        return JSONResponse({"status": "success", "message": "Контакты сохранены"})
+        # Отправляем первое уведомление менеджеру (лид)
+        if bot_instance and settings.MANAGER_CHAT_ID:
+            await send_contact_notification_to_manager(
+                bot=bot_instance,
+                user_id=user_id,
+                data=data,
+                product=product
+            )
+        
+        return JSONResponse({
+            "status": "success", 
+            "message": "Контакты сохранены, заявка отправлена менеджеру"
+        })
         
     except Exception as e:
         logger.error(f"Failed to save contacts: {e}")
@@ -91,6 +116,36 @@ async def save_user_contacts(request: Request):
             {"status": "error", "message": str(e)},
             status_code=500
         )
+
+
+async def send_contact_notification_to_manager(bot, user_id: int, data: dict, product: str = "teremok"):
+    """
+    Отправляет первое уведомление менеджеру о новом лиде (контакты)
+    """
+    product_emoji = "🐭" if product == "teremok" else "⚙️"
+    product_name = "Теремок" if product == "teremok" else "Формула команды"
+    
+    message = (
+        f"{product_emoji} **Новая заявка ({product_name})**\n\n"
+        f"👤 **Имя:** {data.get('name', 'Н/Д')}\n"
+        f"💼 **Роль:** {data.get('role', 'Н/Д')}\n"
+        f"🏢 **Компания:** {data.get('company', 'Н/Д')}\n"
+        f"👥 **Размер команды:** {data.get('team_size', 'Н/Д')}\n"
+        f"📞 **Телефон:** {data.get('phone', 'Н/Д')}\n"
+        f"💬 **Telegram:** @{data.get('username', 'не указан')}\n"
+        f"🆔 **user_id:** `{user_id}`\n\n"
+        f"📝 _Пользователь заполнил контактную форму_"
+    )
+    
+    try:
+        await bot.send_message(
+            chat_id=settings.MANAGER_CHAT_ID,
+            text=message,
+            parse_mode="Markdown"
+        )
+        logger.info(f"Contact notification sent to manager for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send contact notification to manager: {e}")
 
 # ==== NEW: Submit test results endpoint ====
 @router.post("/api/test/submit")

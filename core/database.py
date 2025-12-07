@@ -36,6 +36,7 @@ async def ensure_db_exists():
                 team_size TEXT NOT NULL,
                 phone TEXT NOT NULL,
                 telegram_username TEXT,
+                product TEXT DEFAULT 'teremok',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -48,6 +49,7 @@ async def ensure_db_exists():
                 user_id INTEGER NOT NULL,
                 result_type TEXT NOT NULL,
                 answers TEXT,
+                product TEXT DEFAULT 'teremok',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES user_contacts(user_id)
             )
