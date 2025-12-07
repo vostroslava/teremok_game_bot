@@ -2,25 +2,563 @@
 
 {% block title %}Мини-тест: Кто я по Теремку?{% endblock %}
 
+{% block extra_styles %}
+<style>
+    .test-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-text {
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+
+    /* Question card */
+    .question-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+    }
+
+    .question-text {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 20px;
+        line-height: 1.4;
+    }
+
+    /* Options */
+    .options-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .option-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 2px solid transparent;
+        border-radius: 12px;
+        padding: 16px 20px;
+        text-align: left;
+        color: var(--text);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .option-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.5);
+    }
+
+    .option-btn.selected {
+        background: rgba(102, 126, 234, 0.3);
+        border-color: #667eea;
+    }
+
+    /* Contact form */
+    .contact-form {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 24px;
+    }
+
+    .contact-form h3 {
+        margin-bottom: 16px;
+        color: var(--text);
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 1rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    /* Result card */
+    .result-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border-radius: 20px;
+        padding: 32px;
+        text-align: center;
+    }
+
+    .result-emoji {
+        font-size: 4rem;
+        margin-bottom: 16px;
+    }
+
+    .result-type {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 12px;
+    }
+
+    .result-desc {
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin-bottom: 24px;
+    }
+
+    .result-markers {
+        text-align: left;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+    }
+
+    .result-markers h4 {
+        margin-bottom: 12px;
+        color: var(--text);
+    }
+
+    .result-markers ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .result-markers li {
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+
+    /* Scores breakdown */
+    .scores-breakdown {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        text-align: left;
+    }
+
+    .score-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .score-item:last-child {
+        border-bottom: none;
+    }
+
+    .score-bar {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin: 0 12px;
+        overflow: hidden;
+    }
+
+    .score-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 4px;
+    }
+
+    /* Hidden sections */
+    .hidden {
+        display: none !important;
+    }
+
+    /* Loading */
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-muted);
+    }
+
+    /* Subscribe prompt */
+    .subscribe-prompt {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .subscribe-prompt a {
+        color: #ffc107;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <h1>🧩 Мини-тест</h1>
-    <p class="subtitle">Кто я по Теремку?</p>
+<div class="test-container">
+    <!-- Loading state -->
+    <div id="loadingState" class="loading">
+        <p>⏳ Загрузка теста...</p>
+    </div>
+
+    <!-- Contact form (shown if not subscribed and no contacts) -->
+    <div id="contactSection" class="hidden">
+        <div class="page-header">
+            <h1>📋 Оставьте контакты</h1>
+            <p class="subtitle">Чтобы пройти тест, заполните форму</p>
+        </div>
+
+        <div class="contact-form">
+            <div class="form-group">
+                <label>Имя *</label>
+                <input type="text" id="contactName" placeholder="Ваше имя" required>
+            </div>
+            <div class="form-group">
+                <label>Должность *</label>
+                <input type="text" id="contactRole" placeholder="Ваша должность">
+            </div>
+            <div class="form-group">
+                <label>Компания</label>
+                <input type="text" id="contactCompany" placeholder="Название компании">
+            </div>
+            <div class="form-group">
+                <label>Размер команды *</label>
+                <select id="contactTeamSize">
+                    <option value="">Выберите...</option>
+                    <option value="1-5">1-5 человек</option>
+                    <option value="6-20">6-20 человек</option>
+                    <option value="21-50">21-50 человек</option>
+                    <option value="50+">Более 50</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Телефон *</label>
+                <input type="tel" id="contactPhone" placeholder="+7 (999) 123-45-67">
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%;" onclick="submitContacts()">
+                Отправить и начать тест →
+            </button>
+        </div>
+    </div>
+
+    <!-- Test section -->
+    <div id="testSection" class="hidden">
+        <div class="page-header">
+            <h1>🧩 Мини-тест «Теремок»</h1>
+            <p class="subtitle">Узнайте свой типаж сотрудника</p>
+        </div>
+
+        <div class="progress-text">Вопрос <span id="currentQ">1</span> из <span id="totalQ">10</span></div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+        </div>
+
+        <div class="question-card">
+            <div class="question-text" id="questionText">Загрузка...</div>
+            <div class="options-list" id="optionsList"></div>
+        </div>
+
+        <button class="btn btn-primary hidden" id="nextBtn" style="width: 100%;" onclick="nextQuestion()">
+            Далее →
+        </button>
+    </div>
+
+    <!-- Result section -->
+    <div id="resultSection" class="hidden">
+        <div class="result-card">
+            <div class="result-emoji" id="resultEmoji">🎉</div>
+            <div class="result-type" id="resultType">Ваш типаж</div>
+            <div class="result-desc" id="resultDesc">Описание типажа...</div>
+
+            <div class="result-markers">
+                <h4>📌 Ключевые маркеры:</h4>
+                <ul id="resultMarkers"></ul>
+            </div>
+
+            <div class="scores-breakdown">
+                <h4>📊 Распределение баллов:</h4>
+                <div id="scoresBreakdown"></div>
+            </div>
+
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+                ✅ Результат отправлен менеджеру
+            </p>
+
+            <a href="/app/hub" class="btn btn-primary" style="display: inline-block;">
+                🏠 Вернуться в хаб
+            </a>
+        </div>
+    </div>
 </div>
 
-<div class="placeholder-box">
-    <div class="icon">🔮</div>
-    <h3 style="margin-bottom: 12px; color: var(--text);">Здесь будет мини-тест</h3>
-    <p>Пройдите короткий тест из 5-7 вопросов и узнайте, к какому типажу вы относитесь.</p>
-    <p style="margin-top: 16px; font-size: 0.85rem;">Раздел в разработке</p>
-</div>
+<script>
+    // Global state
+    let userId = null;
+    let username = null;
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let answers = {};
+    let typesData = {};
 
-<div class="card" style="margin-top: 20px;">
-    <h2>📝 Как будет работать тест?</h2>
-    <p>Вам будут предложены ситуации из рабочей жизни. Выбирайте вариант, который ближе всего описывает ваше типичное
-        поведение.</p>
-    <p>По итогам вы получите результат с описанием вашего типажа и рекомендациями.</p>
-</div>
+    // Init
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Get Telegram user data
+        if (window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+
+            if (tg.initDataUnsafe?.user) {
+                userId = tg.initDataUnsafe.user.id;
+                username = tg.initDataUnsafe.user.username;
+            }
+        }
+
+        // Fallback for testing
+        if (!userId) {
+            userId = Math.floor(Math.random() * 1000000) + 1000000;
+        }
+
+        // Load types data
+        try {
+            const typesRes = await fetch('/api/types');
+            typesData = await typesRes.json();
+        } catch (e) {
+            console.error('Failed to load types:', e);
+        }
+
+        // Check access
+        await checkAccess();
+    });
+
+    async function checkAccess() {
+        try {
+            const res = await fetch(`/api/check-subscription?user_id=${userId}`);
+            const data = await res.json();
+
+            document.getElementById('loadingState').classList.add('hidden');
+
+            // If subscribed OR has contact - go to test
+            if (data.subscribed || data.has_contact) {
+                await loadQuestions();
+                document.getElementById('testSection').classList.remove('hidden');
+            } else {
+                // Show contact form
+                document.getElementById('contactSection').classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error('Access check failed:', e);
+            // Fallback - show contact form (for testing in browser without Telegram)
+            document.getElementById('loadingState').classList.add('hidden');
+            // Always start with contact form when API fails
+            document.getElementById('contactSection').classList.remove('hidden');
+        }
+    }
+
+    async function submitContacts() {
+        const name = document.getElementById('contactName').value.trim();
+        const role = document.getElementById('contactRole').value.trim();
+        const company = document.getElementById('contactCompany').value.trim();
+        const teamSize = document.getElementById('contactTeamSize').value;
+        const phone = document.getElementById('contactPhone').value.trim();
+
+        // Validation
+        if (!name || !role || !teamSize || !phone) {
+            alert('Пожалуйста, заполните все обязательные поля');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userId,
+                    name: name,
+                    role: role,
+                    company: company,
+                    team_size: teamSize,
+                    phone: phone,
+                    username: username,
+                    product: 'teremok'
+                })
+            });
+
+            const data = await res.json();
+            if (data.status === 'success') {
+                // Hide contact form, show test
+                document.getElementById('contactSection').classList.add('hidden');
+                await loadQuestions();
+                document.getElementById('testSection').classList.remove('hidden');
+            } else {
+                alert('Ошибка: ' + (data.message || 'Попробуйте позже'));
+            }
+        } catch (e) {
+            console.error('Submit error:', e);
+            alert('Ошибка соединения');
+        }
+    }
+
+    async function loadQuestions() {
+        try {
+            const res = await fetch('/api/teremok/questions');
+            const data = await res.json();
+            questions = data.questions;
+            document.getElementById('totalQ').textContent = questions.length;
+            renderQuestion();
+        } catch (e) {
+            console.error('Failed to load questions:', e);
+        }
+    }
+
+    function renderQuestion() {
+        const q = questions[currentQuestionIndex];
+        document.getElementById('currentQ').textContent = currentQuestionIndex + 1;
+        document.getElementById('progressFill').style.width =
+            ((currentQuestionIndex + 1) / questions.length * 100) + '%';
+
+        document.getElementById('questionText').textContent = q.text;
+
+        const optionsHtml = q.options.map((opt, i) =>
+            `<button class="option-btn" onclick="selectOption(${i})">${opt.text}</button>`
+        ).join('');
+        document.getElementById('optionsList').innerHTML = optionsHtml;
+
+        document.getElementById('nextBtn').classList.add('hidden');
+    }
+
+    function selectOption(index) {
+        // Save answer
+        answers[questions[currentQuestionIndex].id] = index;
+
+        // Highlight selected
+        document.querySelectorAll('.option-btn').forEach((btn, i) => {
+            btn.classList.toggle('selected', i === index);
+        });
+
+        // Show next button
+        document.getElementById('nextBtn').classList.remove('hidden');
+    }
+
+    async function nextQuestion() {
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            renderQuestion();
+        } else {
+            // Submit test
+            await submitTest();
+        }
+    }
+
+    async function submitTest() {
+        document.getElementById('testSection').classList.add('hidden');
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('loadingState').innerHTML = '<p>⏳ Анализируем результаты...</p>';
+
+        try {
+            const res = await fetch('/api/test/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userId,
+                    answers: answers
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                showResult(data.result);
+            } else {
+                alert('Ошибка: ' + (data.message || 'Попробуйте позже'));
+            }
+        } catch (e) {
+            console.error('Submit error:', e);
+            alert('Ошибка соединения');
+        }
+    }
+
+    function showResult(result) {
+        const typeInfo = typesData[result.type] || {};
+
+        document.getElementById('resultEmoji').textContent = typeInfo.emoji || '🎉';
+        document.getElementById('resultType').textContent = typeInfo.name_ru || result.type;
+        document.getElementById('resultDesc').textContent = typeInfo.short_desc || '';
+
+        // Markers
+        const markersHtml = (typeInfo.markers || []).map(m => `<li>${m}</li>`).join('');
+        document.getElementById('resultMarkers').innerHTML = markersHtml || '<li>Нет данных</li>';
+
+        // Scores
+        const scores = result.scores || {};
+        const maxScore = Math.max(...Object.values(scores), 1);
+
+        let scoresHtml = '';
+        const typeNames = {
+            'bird': '🐦 Птица', 'hamster': '🐹 Хомяк', 'fox': '🦊 Лиса',
+            'rat': '🐀 Крыса', 'professional': '👔 Профессионал',
+            'wolf': '🐺 Волк', 'bear': '🐻 Медведь',
+            'beta_leader': '🅱️ Бета-лидер'
+        };
+
+        Object.entries(scores)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([type, score]) => {
+                const pct = (score / maxScore * 100).toFixed(0);
+                scoresHtml += `
+                    <div class="score-item">
+                        <span style="min-width: 120px;">${typeNames[type] || type}</span>
+                        <div class="score-bar"><div class="score-bar-fill" style="width: ${pct}%;"></div></div>
+                        <span style="min-width: 30px; text-align: right;">${score}</span>
+                    </div>
+                `;
+            });
+
+        document.getElementById('scoresBreakdown').innerHTML = scoresHtml || '<p>Нет данных</p>';
+
+        // Show result
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('resultSection').classList.remove('hidden');
+    }
+</script>
 {% endblock %}
 
 {% block navigation %}

@@ -110,10 +110,43 @@ DIAGNOSTIC_QUESTIONS = [
     )
 ]
 
-def calculate_result(scores: Dict[str, int]) -> str:
-    # Find key with max value
-    if not scores:
-        return "bird" # default
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    winner_id = sorted_scores[0][0]
-    return winner_id
+def calculate_result(answers: dict) -> dict:
+    """
+    Calculate test result from user answers.
+    
+    Args:
+        answers: dict of question_id -> option_index
+        
+    Returns:
+        dict with 'type', 'scores', and detailed info
+    """
+    # Aggregate scores from answers
+    total_scores = {}
+    
+    for q_id_str, option_idx in answers.items():
+        q_id = int(q_id_str) if isinstance(q_id_str, str) else q_id_str
+        
+        # Find question
+        question = None
+        for q in DIAGNOSTIC_QUESTIONS:
+            if q.id == q_id:
+                question = q
+                break
+        
+        if question and 0 <= option_idx < len(question.options):
+            option = question.options[option_idx]
+            for type_id, score in option.get('score', {}).items():
+                total_scores[type_id] = total_scores.get(type_id, 0) + score
+    
+    # Find winner
+    if not total_scores:
+        winner_id = "bird"
+    else:
+        sorted_scores = sorted(total_scores.items(), key=lambda x: x[1], reverse=True)
+        winner_id = sorted_scores[0][0]
+    
+    return {
+        "type": winner_id,
+        "scores": total_scores
+    }
+

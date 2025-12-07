@@ -6,7 +6,7 @@ from core.texts import TYPES_DATA
 from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result
 from core.config import settings
 from core.telegram_checks import is_subscribed_to_required_channel
-from core.logic import calculate_result
+from core.logic import calculate_result, DIAGNOSTIC_QUESTIONS
 import os
 import logging
 
@@ -31,6 +31,19 @@ def set_bot(bot):
 async def get_types():
     # Convert dataclasses to dicts
     return {k: v.__dict__ for k, v in TYPES_DATA.items()}
+
+# API Endpoint to get Teremok test questions
+@router.get("/api/teremok/questions")
+async def get_teremok_questions():
+    """Return all diagnostic questions for Teremok test"""
+    questions = []
+    for q in DIAGNOSTIC_QUESTIONS:
+        questions.append({
+            "id": q.id,
+            "text": q.text,
+            "options": [{"text": opt["text"], "index": i} for i, opt in enumerate(q.options)]
+        })
+    return {"questions": questions, "total": len(questions)}
 
 # ==== NEW: Check subscription endpoint ====
 @router.get("/api/check-subscription")
@@ -125,23 +138,26 @@ async def send_contact_notification_to_manager(bot, user_id: int, data: dict, pr
     product_emoji = "🐭" if product == "teremok" else "⚙️"
     product_name = "Теремок" if product == "teremok" else "Формула команды"
     
+    tg_username = data.get('username') or 'не указан'
+    tg_link = f"@{tg_username}" if tg_username != 'не указан' else 'не указан'
+    
     message = (
-        f"{product_emoji} **Новая заявка ({product_name})**\n\n"
-        f"👤 **Имя:** {data.get('name', 'Н/Д')}\n"
-        f"💼 **Роль:** {data.get('role', 'Н/Д')}\n"
-        f"🏢 **Компания:** {data.get('company', 'Н/Д')}\n"
-        f"👥 **Размер команды:** {data.get('team_size', 'Н/Д')}\n"
-        f"📞 **Телефон:** {data.get('phone', 'Н/Д')}\n"
-        f"💬 **Telegram:** @{data.get('username', 'не указан')}\n"
-        f"🆔 **user_id:** `{user_id}`\n\n"
-        f"📝 _Пользователь заполнил контактную форму_"
+        f"{product_emoji} <b>Новая заявка ({product_name})</b>\n\n"
+        f"👤 <b>Имя:</b> {data.get('name', 'Н/Д')}\n"
+        f"💼 <b>Роль:</b> {data.get('role', 'Н/Д')}\n"
+        f"🏢 <b>Компания:</b> {data.get('company', 'Н/Д')}\n"
+        f"👥 <b>Размер команды:</b> {data.get('team_size', 'Н/Д')}\n"
+        f"📞 <b>Телефон:</b> {data.get('phone', 'Н/Д')}\n"
+        f"💬 <b>Telegram:</b> {tg_link}\n"
+        f"🆔 <b>user_id:</b> <code>{user_id}</code>\n\n"
+        f"📝 <i>Пользователь заполнил контактную форму</i>"
     )
     
     try:
         await bot.send_message(
             chat_id=settings.MANAGER_CHAT_ID,
             text=message,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         logger.info(f"Contact notification sent to manager for user {user_id}")
     except Exception as e:
@@ -195,6 +211,7 @@ async def submit_test_results(request: Request):
             "status": "success",
             "result": {
                 "type": result_type,
+                "scores": result.get('scores', {}),
                 "emoji": type_info.emoji if type_info else "",
                 "name": type_info.name_ru if type_info else result_type,
                 "description": type_info.short_desc if type_info else ""
@@ -224,44 +241,46 @@ async def send_test_notification_to_manager(bot, user_id: int, contact: dict, re
     
     # Формируем блок с контактами
     if contact:
+        tg_username = contact.get('telegram_username') or 'не указан'
+        tg_link = f"@{tg_username}" if tg_username != 'не указан' else 'не указан'
         contact_info = (
-            f"👤 **Имя:** {contact.get('name', 'Н/Д')}\n"
-            f"💼 **Роль:** {contact.get('role', 'Н/Д')}\n"
-            f"🏢 **Компания:** {contact.get('company', 'Н/Д')}\n"
-            f"👥 **Размер команды:** {contact.get('team_size', 'Н/Д')}\n"
-            f"📞 **Телефон:** {contact.get('phone', 'Н/Д')}\n"
-            f"💬 **Telegram:** @{contact.get('telegram_username', 'не указан')}\n"
+            f"👤 <b>Имя:</b> {contact.get('name', 'Н/Д')}\n"
+            f"💼 <b>Роль:</b> {contact.get('role', 'Н/Д')}\n"
+            f"🏢 <b>Компания:</b> {contact.get('company', 'Н/Д')}\n"
+            f"👥 <b>Размер команды:</b> {contact.get('team_size', 'Н/Д')}\n"
+            f"📞 <b>Телефон:</b> {contact.get('phone', 'Н/Д')}\n"
+            f"💬 <b>Telegram:</b> {tg_link}\n"
         )
     else:
-        contact_info = "📢 **Подписан на канал, контакты не оставлены**\n"
+        contact_info = "📢 <b>Подписан на канал, контакты не оставлены</b>\n"
     
     # Формируем сообщение
     message = (
-        f"🎯 **Пользователь прошёл тест \"Теремок\"**\n\n"
+        f"🎯 <b>Пользователь прошёл тест «Теремок»</b>\n\n"
         f"{contact_info}"
-        f"🆔 **user_id:** `{user_id}`\n\n"
+        f"🆔 <b>user_id:</b> <code>{user_id}</code>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"**Результаты теста:**\n\n"
+        f"<b>Результаты теста:</b>\n\n"
     )
     
     if type_info:
         message += (
-            f"{type_info.emoji} **Типаж:** {type_info.name_ru}\n\n"
-            f"**Описание:**\n{type_info.short_desc}\n\n"
+            f"{type_info.emoji} <b>Типаж:</b> {type_info.name_ru}\n\n"
+            f"<b>Описание:</b>\n{type_info.short_desc}\n\n"
         )
         
         # Добавляем маркеры если есть
         if type_info.markers:
             markers_text = "\n".join([f"• {m}" for m in type_info.markers[:5]])
-            message += f"**Ключевые маркеры:**\n{markers_text}\n\n"
+            message += f"<b>Ключевые маркеры:</b>\n{markers_text}\n\n"
     else:
-        message += f"**Типаж:** {result_type}\n\n"
+        message += f"<b>Типаж:</b> {result_type}\n\n"
     
     try:
         await bot.send_message(
             chat_id=settings.MANAGER_CHAT_ID,
             text=message,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         logger.info(f"Test notification sent to manager for user {user_id}")
     except Exception as e:
