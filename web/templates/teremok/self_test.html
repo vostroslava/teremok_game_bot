@@ -58,24 +58,42 @@
 
     .option-btn {
         background: rgba(255, 255, 255, 0.08);
-        border: 2px solid transparent;
+        border: 2px solid rgba(255, 255, 255, 0.2);
         border-radius: 12px;
         padding: 16px 20px;
         text-align: left;
         color: var(--text);
         font-size: 1rem;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
+        position: relative;
     }
 
-    .option-btn:hover {
+    .option-btn:hover:not(:disabled) {
         background: rgba(102, 126, 234, 0.2);
         border-color: rgba(102, 126, 234, 0.5);
+        transform: translateX(4px);
     }
 
     .option-btn.selected {
-        background: rgba(102, 126, 234, 0.3);
-        border-color: #667eea;
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(102, 126, 234, 0.3));
+        border-color: #4caf50;
+        transform: scale(1.02);
+    }
+
+    .option-btn.selected::before {
+        content: '✓ ';
+        color: #4caf50;
+        font-weight: bold;
+    }
+
+    .option-btn.dimmed {
+        opacity: 0.4;
+        transform: scale(0.98);
+    }
+
+    .option-btn:disabled {
+        cursor: default;
     }
 
     /* Contact form */
@@ -283,7 +301,7 @@
     <div id="testSection" class="hidden">
         <div class="page-header">
             <h1>🧩 Мини-тест «Теремок»</h1>
-            <p class="subtitle">Узнайте свой типаж сотрудника</p>
+            <p class="subtitle">Выберите ответ — он сохранится автоматически</p>
         </div>
 
         <div class="progress-text">Вопрос <span id="currentQ">1</span> из <span id="totalQ">10</span></div>
@@ -295,10 +313,6 @@
             <div class="question-text" id="questionText">Загрузка...</div>
             <div class="options-list" id="optionsList"></div>
         </div>
-
-        <button class="btn btn-primary hidden" id="nextBtn" style="width: 100%;" onclick="nextQuestion()">
-            Далее →
-        </button>
     </div>
 
     <!-- Result section -->
@@ -461,31 +475,36 @@
             `<button class="option-btn" onclick="selectOption(${i})">${opt.text}</button>`
         ).join('');
         document.getElementById('optionsList').innerHTML = optionsHtml;
-
-        document.getElementById('nextBtn').classList.add('hidden');
     }
 
     function selectOption(index) {
+        // Disable all buttons to prevent double-click
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.disabled = true;
+        });
+
         // Save answer
         answers[questions[currentQuestionIndex].id] = index;
 
-        // Highlight selected
+        // Highlight selected with animation
         document.querySelectorAll('.option-btn').forEach((btn, i) => {
-            btn.classList.toggle('selected', i === index);
+            if (i === index) {
+                btn.classList.add('selected');
+            } else {
+                btn.classList.add('dimmed');
+            }
         });
 
-        // Show next button
-        document.getElementById('nextBtn').classList.remove('hidden');
-    }
-
-    async function nextQuestion() {
-        if (currentQuestionIndex < questions.length - 1) {
-            currentQuestionIndex++;
-            renderQuestion();
-        } else {
-            // Submit test
-            await submitTest();
-        }
+        // Auto-advance after short delay for visual feedback
+        setTimeout(async () => {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                // Last question - submit test
+                await submitTest();
+            }
+        }, 400);
     }
 
     async function submitTest() {

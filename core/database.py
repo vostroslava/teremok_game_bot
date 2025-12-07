@@ -55,6 +55,17 @@ async def ensure_db_exists():
             )
         """)
         
+        # Admins table - for role-based access
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admins (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                role TEXT DEFAULT 'admin',
+                added_by INTEGER,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         await db.commit()
 
 async def add_user(user_id: int, username: str, first_name: str):
@@ -127,3 +138,74 @@ async def get_test_results(user_id: int) -> list:
         ) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+# ===== ADMIN FUNCTIONS =====
+
+async def add_admin(user_id: int, username: str = None, role: str = 'admin', added_by: int = None):
+    """Add a user as admin"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO admins (user_id, username, role, added_by) VALUES (?, ?, ?, ?)",
+            (user_id, username, role, added_by)
+        )
+        await db.commit()
+
+async def remove_admin(user_id: int):
+    """Remove admin rights from a user"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        await db.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+async def is_admin(user_id: int) -> bool:
+    """Check if user is an admin"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute(
+            "SELECT 1 FROM admins WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+async def get_admin_role(user_id: int) -> str | None:
+    """Get admin role (owner/admin) or None if not admin"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute(
+            "SELECT role FROM admins WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+async def get_all_admins() -> list:
+    """Get all admins"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM admins ORDER BY added_at") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+async def get_all_leads(limit: int = 20) -> list:
+    """Get recent leads (contacts) for admin panel"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT c.*, t.result_type, t.created_at as test_date 
+               FROM user_contacts c 
+               LEFT JOIN test_results t ON c.user_id = t.user_id 
+               ORDER BY c.created_at DESC 
+               LIMIT ?""",
+            (limit,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+async def get_leads_count() -> int:
+    """Get total number of leads"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute("SELECT COUNT(*) FROM user_contacts") as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+async def get_tests_count() -> int:
+    """Get total number of completed tests"""
+    async with aiosqlite.connect(settings.DB_NAME) as db:
+        async with db.execute("SELECT COUNT(*) FROM test_results") as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0

@@ -109,8 +109,8 @@ async def save_user_contacts(request: Request):
         
         logger.info(f"Contacts saved for user {user_id}")
         
-        # Отправляем первое уведомление менеджеру (лид)
-        if bot_instance and settings.MANAGER_CHAT_ID:
+        # Отправляем уведомление менеджеру только если включено
+        if settings.SEND_NOTIFICATIONS and bot_instance and settings.MANAGER_CHAT_ID:
             await send_contact_notification_to_manager(
                 bot=bot_instance,
                 user_id=user_id,
@@ -120,7 +120,7 @@ async def save_user_contacts(request: Request):
         
         return JSONResponse({
             "status": "success", 
-            "message": "Контакты сохранены, заявка отправлена менеджеру"
+            "message": "Контакты сохранены"
         })
         
     except Exception as e:
@@ -194,8 +194,8 @@ async def submit_test_results(request: Request):
         # Получаем контакты (если есть)
         contact = await get_contact(user_id)
         
-        # Отправляем уведомление менеджеру
-        if bot_instance and settings.MANAGER_CHAT_ID:
+        # Отправляем уведомление менеджеру только если включено
+        if settings.SEND_NOTIFICATIONS and bot_instance and settings.MANAGER_CHAT_ID:
             await send_test_notification_to_manager(
                 bot=bot_instance,
                 user_id=user_id,

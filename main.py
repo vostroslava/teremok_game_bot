@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher
 import logging
 import asyncio
 from core.config import settings
-from bot.handlers import common, materials, diagnostics, lead_form
+from bot.handlers import common, materials, diagnostics, lead_form, admin
 from core.database import ensure_db_exists
 
 import uvicorn
@@ -12,6 +12,7 @@ from bot.handlers import common
 async def start_bot(bot: Bot, dp: Dispatcher):
     print("🤖 Бот запускается...")
     # Include routers
+    dp.include_router(admin.router)  # Admin commands first
     dp.include_router(common.router)
     dp.include_router(lead_form.router)
     
