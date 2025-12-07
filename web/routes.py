@@ -1,6 +1,6 @@
 from fastapi import FastAPI, APIRouter, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from core.texts import TYPES_DATA
 from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result
@@ -109,14 +109,16 @@ async def save_user_contacts(request: Request):
         
         logger.info(f"Contacts saved for user {user_id}")
         
-        # Отправляем уведомление менеджеру только если включено
-        if settings.SEND_NOTIFICATIONS and bot_instance and settings.MANAGER_CHAT_ID:
-            await send_contact_notification_to_manager(
-                bot=bot_instance,
-                user_id=user_id,
-                data=data,
-                product=product
-            )
+        # Отправляем короткое уведомление менеджеру
+        if bot_instance and settings.MANAGER_CHAT_ID:
+            try:
+                await bot_instance.send_message(
+                    chat_id=settings.MANAGER_CHAT_ID,
+                    text="📬 <b>Новая заявка!</b>\n\nИспользуйте /leads чтобы посмотреть детали.",
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"Failed to send notification: {e}")
         
         return JSONResponse({
             "status": "success", 
@@ -383,11 +385,10 @@ app.include_router(router)
 static_path = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
+from fastapi.responses import RedirectResponse
+
 @app.get("/")
 async def read_root():
-    return FileResponse(os.path.join(static_path, "index.html"))
+    """Redirect root to main hub"""
+    return RedirectResponse(url="/app/hub")
 
-# For detailed view if we want deep linking in future
-@app.get("/type/{type_id}")
-async def read_type_page(type_id: str):
-    return FileResponse(os.path.join(static_path, "index.html"))
