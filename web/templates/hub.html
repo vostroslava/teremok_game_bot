@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Теремок & Формула</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --bg: #1a1a2e;
+            --card: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, #302b63 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            padding-bottom: 40px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px 0 30px;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* Menu Items */
+        .menu {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px 20px;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+
+        .menu-item:active {
+            transform: scale(0.98);
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .menu-icon {
+            font-size: 1.8rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .menu-content h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-content p {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        /* Section Divider */
+        .divider {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 24px 0 16px;
+        }
+
+        /* Quick Links */
+        .quick-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .quick-link {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-decoration: none;
+            color: var(--text);
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .quick-link:active {
+            transform: scale(0.97);
+        }
+
+        .quick-link .icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .quick-link span {
+            font-size: 0.85rem;
+            display: block;
+        }
+
+        /* Channel Button */
+        .channel-btn {
+            display: block;
+            background: linear-gradient(135deg, #0088cc, #00a8e8);
+            color: white;
+            text-align: center;
+            padding: 16px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .channel-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer p {
+            font-size: 0.75rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Добро пожаловать!</h1>
+            <p>Выберите интересующий раздел</p>
+        </div>
+
+        <div class="menu">
+            <a href="/app/teremok/overview" class="menu-item">
+                <div class="menu-icon">🐭</div>
+                <div class="menu-content">
+                    <h3>Теремок</h3>
+                    <p>Типажи и мотивация сотрудников</p>
+                </div>
+            </a>
+
+            <a href="/app/formula/overview" class="menu-item">
+                <div class="menu-icon">⚙️</div>
+                <div class="menu-content">
+                    <h3>Формула команды</h3>
+                    <p>Системность, роли и развитие</p>
+                </div>
+            </a>
+        </div>
+
+        <div class="divider">Быстрые действия</div>
+
+        <div class="quick-grid">
+            <a href="/app/teremok/self_test" class="quick-link">
+                <div class="icon">🧩</div>
+                <span>Мини-тест</span>
+            </a>
+            <a href="/app/teremok/types_overview" class="quick-link">
+                <div class="icon">👥</div>
+                <span>Типажи</span>
+            </a>
+            <a href="/app/formula/team_quiz" class="quick-link">
+                <div class="icon">📊</div>
+                <span>Диагностика</span>
+            </a>
+            <a href="/app/formula/matrix" class="quick-link">
+                <div class="icon">🗺️</div>
+                <span>Матрица</span>
+            </a>
+        </div>
+
+        <a href="https://t.me/testtesttest12332221" target="_blank" class="channel-btn">
+            📢 Наш Telegram-канал
+        </a>
+
+        <div class="footer">
+            <p>Методики для руководителей и HR.<br>Тренинги и консультации.</p>
+        </div>
+    </div>
+
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+        }
+    </script>
+</body>
+
+</html>

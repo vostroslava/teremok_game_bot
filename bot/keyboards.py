@@ -3,6 +3,38 @@ from aiogram.types import InlineKeyboardButton, KeyboardButton, WebAppInfo, Repl
 from core.texts import TYPES_DATA
 from core.config import settings
 
+def hub_menu_keyboard() -> InlineKeyboardMarkup:
+    """Главное меню-хаб с WebApp кнопками"""
+    builder = InlineKeyboardBuilder()
+    
+    # Формируем URL для хаба
+    base_url = settings.WEB_APP_URL.rstrip('/') if settings.WEB_APP_URL else "https://localhost:8000"
+    hub_url = base_url + "/app/hub"
+    
+    # WebApp кнопки для разделов
+    builder.row(InlineKeyboardButton(
+        text="🐭 Теремок",
+        web_app=WebAppInfo(url=base_url + "/app/teremok/overview")
+    ))
+    builder.row(InlineKeyboardButton(
+        text="⚙️ Формула команды",
+        web_app=WebAppInfo(url=base_url + "/app/formula/overview")
+    ))
+    
+    # URL кнопка для канала (открывает Telegram напрямую)
+    builder.row(InlineKeyboardButton(
+        text="📢 Наш Telegram-канал",
+        url="https://t.me/testtesttest12332221"
+    ))
+    
+    # Ссылка на полный хаб
+    builder.row(InlineKeyboardButton(
+        text="🌐 Открыть полный хаб",
+        web_app=WebAppInfo(url=hub_url)
+    ))
+    
+    return builder.as_markup()
+
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="🏠 О тренинге «Теремок»", callback_data="about_teremok"))

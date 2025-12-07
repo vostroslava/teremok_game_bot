@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Матрица системности — Формула{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 Матрица системности</h1>
+    <p class="subtitle">Визуальная карта компетенций команды</p>
+</div>
+
+<div class="card">
+    <h2>Как работает матрица?</h2>
+    <p>Матрица показывает уровень развития команды по ключевым направлениям. Каждая ячейка — это область компетенций.
+    </p>
+</div>
+
+<div class="card">
+    <div class="matrix-placeholder">
+        <div class="matrix-cell">Цели</div>
+        <div class="matrix-cell">Процессы</div>
+        <div class="matrix-cell">Люди</div>
+        <div class="matrix-cell">Коммуникация</div>
+        <div class="matrix-cell">Контроль</div>
+        <div class="matrix-cell">Развитие</div>
+        <div class="matrix-cell">Культура</div>
+        <div class="matrix-cell">Ресурсы</div>
+        <div class="matrix-cell">Результат</div>
+    </div>
+    <p style="text-align: center; color: var(--text-muted); margin-top: 16px; font-size: 0.85rem;">
+        Интерактивная матрица в разработке
+    </p>
+</div>
+
+<div class="card">
+    <h2>🎯 Уровни заполнения</h2>
+    <p><span style="color: #f56565;">●</span> Критично — требует немедленного внимания</p>
+    <p><span style="color: #ecc94b;">●</span> В работе — есть потенциал для роста</p>
+    <p><span style="color: #48bb78;">●</span> Системно — работает стабильно</p>
+</div>
+{% endblock %}
+
+{% block navigation %}
+<div class="nav-buttons">
+    <a href="/app/formula/overview" class="btn btn-secondary">← К Формуле</a>
+    <a href="/app/hub" class="btn btn-secondary">🏠 В хаб</a>
+</div>
+{% endblock %}

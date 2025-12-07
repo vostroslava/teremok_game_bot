@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from core.texts import TYPES_DATA
 from core.database import save_lead, has_contact, get_contact, save_contact, save_test_result
 from core.config import settings
@@ -13,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 router = APIRouter()
+
+# Jinja2 templates for new app pages
+templates_path = os.path.join(os.path.dirname(__file__), "templates")
+templates = Jinja2Templates(directory=templates_path)
 
 # Bot instance for notifications (will be set from main.py)
 bot_instance = None
@@ -249,6 +254,52 @@ async def submit_lead(request: Request):
         return JSONResponse({"status": "success", "message": "Заявка отправлена!"})
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+# ==== NEW: App Page Routes (Jinja2 templates) ====
+
+# Hub
+@app.get("/app/hub")
+async def app_hub(request: Request):
+    return templates.TemplateResponse("hub.html", {"request": request})
+
+# Teremok section
+@app.get("/app/teremok/overview")
+async def teremok_overview(request: Request):
+    return templates.TemplateResponse("teremok/overview.html", {"request": request})
+
+@app.get("/app/teremok/self_test")
+async def teremok_self_test(request: Request):
+    return templates.TemplateResponse("teremok/self_test.html", {"request": request})
+
+@app.get("/app/teremok/types_overview")
+async def teremok_types_overview(request: Request):
+    return templates.TemplateResponse("teremok/types_overview.html", {"request": request})
+
+@app.get("/app/teremok/cases")
+async def teremok_cases(request: Request):
+    return templates.TemplateResponse("teremok/cases.html", {"request": request})
+
+# Formula section
+@app.get("/app/formula/overview")
+async def formula_overview(request: Request):
+    return templates.TemplateResponse("formula/overview.html", {"request": request})
+
+@app.get("/app/formula/team_quiz")
+async def formula_team_quiz(request: Request):
+    return templates.TemplateResponse("formula/team_quiz.html", {"request": request})
+
+@app.get("/app/formula/matrix")
+async def formula_matrix(request: Request):
+    return templates.TemplateResponse("formula/matrix.html", {"request": request})
+
+@app.get("/app/formula/mistakes")
+async def formula_mistakes(request: Request):
+    return templates.TemplateResponse("formula/mistakes.html", {"request": request})
+
+# Channel
+@app.get("/app/channel")
+async def app_channel(request: Request):
+    return templates.TemplateResponse("channel.html", {"request": request})
 
 # Mount specific routes first
 app.include_router(router)

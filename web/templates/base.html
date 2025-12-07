@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Теремок{% endblock %}</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --bg-dark: #1a1a2e;
+            --bg-card: #16213e;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --success: #48bb78;
+            --warning: #ecc94b;
+            --radius: 16px;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0f0f23 100%);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        /* Header */
+        .page-header {
+            text-align: center;
+            padding: 30px 0;
+            margin-bottom: 20px;
+        }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .page-header .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .card p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Menu Items */
+        .menu-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-decoration: none;
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .menu-item .icon {
+            font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+        }
+
+        .menu-item .content h3 {
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .menu-item .content p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* Type Cards (for types overview) */
+        .type-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .type-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .type-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--primary);
+        }
+
+        .type-card .emoji {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .type-card h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .type-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Matrix placeholder */
+        .matrix-placeholder {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 20px;
+        }
+
+        .matrix-cell {
+            aspect-ratio: 1;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+            border: 1px dashed rgba(102, 126, 234, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-channel {
+            background: linear-gradient(135deg, #0088cc, #00a8e8);
+            color: white;
+            width: 100%;
+        }
+
+        /* Navigation */
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .nav-buttons .btn {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        /* Placeholder text */
+        .placeholder-box {
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px dashed rgba(102, 126, 234, 0.3);
+            border-radius: var(--radius);
+            padding: 40px 24px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .placeholder-box .icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        /* Telegram Web App specific */
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px;
+            }
+
+            .page-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .type-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        {% block content %}{% endblock %}
+
+        {% block navigation %}
+        <div class="nav-buttons">
+            {% if back_url %}
+            <a href="{{ back_url }}" class="btn btn-secondary">← Назад</a>
+            {% endif %}
+            <a href="/app/hub" class="btn btn-secondary">🏠 В хаб</a>
+        </div>
+        {% endblock %}
+    </div>
+
+    <script>
+        // Initialize Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+
+            // Apply Telegram theme colors if available
+            if (tg.themeParams) {
+                document.documentElement.style.setProperty('--bg-dark', tg.themeParams.bg_color || '#1a1a2e');
+                document.documentElement.style.setProperty('--text', tg.themeParams.text_color || '#e2e8f0');
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
