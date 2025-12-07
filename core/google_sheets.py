@@ -22,7 +22,7 @@ async def send_to_sheets(data: Union[dict, List[dict]]) -> bool:
         return False
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=4.0) as client:
             response = await client.post(
                 webhook_url,
                 json=data,
