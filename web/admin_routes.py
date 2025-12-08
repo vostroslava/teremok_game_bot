@@ -2,9 +2,10 @@
 Web Admin Panel Routes
 Protected by ADMIN_PANEL_SECRET
 """
-from fastapi import APIRouter, Request, Query, Depends, Form
+from fastapi import APIRouter, Request, Depends, HTTPException, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
 from core.config import settings
 from core.texts import TYPES_DATA
 from repositories.user_repository import UserRepository
@@ -134,42 +135,69 @@ async def logout(request: Request):
 
 # ===== DASHBOARD =====
 
+# ===== DASHBOARD =====
+
+# Helper
+def serialize_record(record):
+    """Convert asyncpg record to dict and serialize types"""
+    data = dict(record)
+    for key, value in data.items():
+        if isinstance(value, datetime):
+            data[key] = value.strftime("%Y-%m-%d %H:%M:%S")
+    return data
+
 @router.get("")
 @router.get("/dashboard")
 async def admin_dashboard(request: Request, key: str = None):
-    """Admin dashboard overview"""
-    if not await verify_admin_auth(request):
-        return RedirectResponse(url="/app/admin/login", status_code=303)
-    
-    logger.info(f"Admin dashboard accessed from {request.client.host}")
-    
-    # Get stats (still using legacy function for now)
-    stats = await user_service.get_statistics()
-    daily_stats = await user_service.get_daily_statistics()
-    
-    # Get recent activity via service
-    recent_leads = await user_service.get_recent_leads_full(limit=5)
-    recent_tests = await test_service.get_recent_tests_full(limit=5)
-    
-    return templates.TemplateResponse("admin/dashboard.html", {
-        "request": request,
-        "stats": stats,
-        "recent_leads": recent_leads,
-        "recent_tests": recent_tests,
-        "chart_labels": daily_stats['labels'],
-        "chart_leads": daily_stats['leads'],
-        "chart_tests": daily_stats['tests'],
-        "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
-    })
-    
-    # Set cookie if key provided
+    # ... (auth check)
+    try:
+        if not await verify_admin_auth(request):
+            return RedirectResponse(url="/app/admin/login", status_code=303)
+        
+        logger.info(f"Admin dashboard accessed from {request.client.host}")
+        
+        # Get stats
+        stats = await user_service.get_statistics()
+        daily_stats = await user_service.get_daily_statistics()
+        
+        # Get recent activity
+        recent_leads = await user_service.get_recent_leads_full(limit=5)
+        recent_leads = [serialize_record(l) for l in recent_leads]
+        
+        recent_tests = await test_service.get_recent_tests_full(limit=5)
+        
+        # Enrich tests
+        recent_tests_enriched = []
+        for t in recent_tests:
+            test_dict = serialize_record(t)
+            type_info = TYPES_DATA.get(test_dict.get('result_type'))
+            if type_info:
+                test_dict['type_emoji'] = type_info.emoji
+                test_dict['type_name'] = type_info.name_ru
+            else:
+                test_dict['type_emoji'] = "❓"
+                test_dict['type_name'] = test_dict.get('result_type')
+            recent_tests_enriched.append(test_dict)
+
+        return templates.TemplateResponse("admin/dashboard.html", {
+            "request": request,
+            "stats": stats,
+            "recent_leads": recent_leads,
+            "recent_tests": recent_tests_enriched,
+            "chart_labels": daily_stats['labels'],
+            "chart_leads": daily_stats['leads'],
+            "chart_tests": daily_stats['tests'],
+            "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
+        })
+    except Exception as e:
+        logger.error(f"Error in admin_dashboard: {e}", exc_info=True)
+        return HTMLResponse(content=f"<h1>Error</h1><pre>{e}</pre>", status_code=500)
+
     if key:
         response.set_cookie("admin_key", key, max_age=86400*7, httponly=True)
-    
     return response
 
-# ===== LEADS =====
-
+# ... LEADS ...
 @router.get("/leads")
 async def admin_leads(request: Request, 
                       status: str = "all",
@@ -196,6 +224,9 @@ async def admin_leads(request: Request,
         sort_order=sort_order
     )
     
+    # Serialize
+    leads = [serialize_record(l) for l in leads]
+    
     return templates.TemplateResponse("admin/leads.html", {
         "request": request,
         "leads": leads,
@@ -207,8 +238,7 @@ async def admin_leads(request: Request,
         "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
     })
 
-# ===== TESTS =====
-
+# ... TESTS ...
 @router.get("/tests")
 async def admin_tests(request: Request,
                       product: str = "all",
@@ -235,12 +265,15 @@ async def admin_tests(request: Request,
         sort_order=sort_order
     )
     
-    # Add type info
-    for test in tests:
-        type_info = TYPES_DATA.get(test.get('result_type'))
+    # Add type info and serialize
+    tests_enriched = []
+    for t in tests:
+        test_dict = serialize_record(t)
+        type_info = TYPES_DATA.get(test_dict.get('result_type'))
         if type_info:
-            test['type_emoji'] = type_info.emoji
-            test['type_name'] = type_info.name_ru
+            test_dict['type_emoji'] = type_info.emoji
+            test_dict['type_name'] = type_info.name_ru
+        tests_enriched.append(test_dict)
     
     # Get all available types
     all_types = [{"id": t.id, "name": t.name_ru, "emoji": t.emoji} 
@@ -248,7 +281,7 @@ async def admin_tests(request: Request,
     
     return templates.TemplateResponse("admin/tests.html", {
         "request": request,
-        "tests": tests,
+        "tests": tests_enriched,
         "all_types": all_types,
         "current_product": product,
         "current_type": result_type,
@@ -257,6 +290,7 @@ async def admin_tests(request: Request,
         "current_sort_order": sort_order,
         "key": key or request.query_params.get("key") or request.cookies.get("admin_key")
     })
+# ... REST OF FILE ...
 
 # ===== SETTINGS =====
 
@@ -311,6 +345,8 @@ async def export_leads_to_sheets(request: Request):
         from core.google_sheets import send_to_sheets
         
         leads = await user_service.get_all_leads_full(limit=10000)
+        # Convert to dicts
+        leads = [dict(l) for l in leads]
         
         # Prepare all data first
         all_data = []
@@ -356,6 +392,8 @@ async def export_tests_to_sheets(request: Request):
         import json
         
         tests = await test_service.get_all_tests_full(limit=10000)
+        # Convert to dicts
+        tests = [dict(t) for t in tests]
         
         all_data = []
         for test in tests:

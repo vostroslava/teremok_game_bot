@@ -13,24 +13,25 @@ class TestRepository(BaseRepository):
         scores_json = json.dumps(result.scores) if isinstance(result.scores, dict) else result.scores
         answers_json = json.dumps(result.answers) if isinstance(result.answers, dict) else result.answers
         
-        cursor = await self.execute(
+        # Postgres requires RETURNING id
+        val = await self.fetch_val(
             """INSERT INTO test_results (user_id, result_type, answers, scores, product)
-               VALUES (?, ?, ?, ?, ?)""",
-            (result.user_id, result.result_type, answers_json, scores_json, result.product)
+               VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+            result.user_id, result.result_type, answers_json, scores_json, result.product
         )
-        return cursor.lastrowid
+        return val
 
     async def save_formula_result(self, result: FormulaResult) -> int:
         scores_json = json.dumps(result.scores) if isinstance(result.scores, dict) else result.scores
         answers_json = json.dumps(result.answers) if isinstance(result.answers, (dict, list)) else result.answers
         
-        cursor = await self.execute(
+        val = await self.fetch_val(
             """INSERT INTO formula_rsp_results 
                (user_id, primary_type_code, primary_type_name, scores, answers)
-               VALUES (?, ?, ?, ?, ?)""",
-            (result.user_id, result.primary_type_code, result.primary_type_name, scores_json, answers_json)
+               VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+            result.user_id, result.primary_type_code, result.primary_type_name, scores_json, answers_json
         )
-        return cursor.lastrowid
+        return val
 
     async def get_all_tests_full(self, limit: int = 100, product: str = None,
                                   result_type: str = None, days: int = None,
@@ -47,16 +48,16 @@ class TestRepository(BaseRepository):
         params = []
         
         if product and product != 'all':
-            conditions.append("t.product = ?")
+            conditions.append(f"t.product = ${len(params) + 1}")
             params.append(product)
         
         if result_type and result_type != 'all':
-            conditions.append("t.result_type = ?")
+            conditions.append(f"t.result_type = ${len(params) + 1}")
             params.append(result_type)
         
         if days:
-            date_from = (datetime.now() - timedelta(days=days)).isoformat()
-            conditions.append("t.created_at >= ?")
+            date_from = datetime.now() - timedelta(days=days)
+            conditions.append(f"t.created_at >= ${len(params) + 1}")
             params.append(date_from)
         
         if conditions:
@@ -75,10 +76,11 @@ class TestRepository(BaseRepository):
         sort_col = sort_columns.get(sort_by, "t.created_at")
         order = "ASC" if sort_order and sort_order.lower() == "asc" else "DESC"
         
-        query += f" ORDER BY {sort_col} {order} LIMIT ?"
+        query += f" ORDER BY {sort_col} {order} LIMIT ${len(params) + 1}"
         params.append(limit)
         
-        return await self.fetch_all(query, tuple(params))
+        rows = await self.fetch_all(query, *params)
+        return [dict(row) for row in rows]
 
     async def get_recent_tests_full(self, limit: int = 10) -> list:
         """Get recent tests for dashboard"""
@@ -86,15 +88,15 @@ class TestRepository(BaseRepository):
 
     async def get_user_results(self, user_id: int) -> List[TestResult]:
         rows = await self.fetch_all(
-            "SELECT * FROM test_results WHERE user_id = ? ORDER BY created_at DESC",
-            (user_id,)
+            "SELECT * FROM test_results WHERE user_id = $1 ORDER BY created_at DESC",
+            user_id
         )
         return [TestResult(**dict(row)) for row in rows]
     
     async def get_test_result_by_id(self, result_id: int) -> Optional[TestResult]:
-        row = await self.fetch_one("SELECT * FROM test_results WHERE id = ?", (result_id,))
+        row = await self.fetch_one("SELECT * FROM test_results WHERE id = $1", result_id)
         return TestResult(**dict(row)) if row else None
         
     async def get_formula_result_by_id(self, result_id: int) -> Optional[FormulaResult]:
-        row = await self.fetch_one("SELECT * FROM formula_rsp_results WHERE id = ?", (result_id,))
+        row = await self.fetch_one("SELECT * FROM formula_rsp_results WHERE id = $1", result_id)
         return FormulaResult(**dict(row)) if row else None

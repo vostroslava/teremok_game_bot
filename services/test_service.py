@@ -41,6 +41,7 @@ class TestService:
         # Save
         result_id = await self.test_repo.save_formula_result(result)
         result.id = result_id
+        computed.id = result_id
         
         # Return full computer result object for frontend (adding derived fields)
         return computed

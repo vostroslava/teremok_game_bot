@@ -227,3 +227,99 @@ tr:hover td {
     background: rgba(239, 68, 68, 0.15);
     color: var(--danger);
 }
+
+/* --- MOBILE RESPONSIVE --- */
+@media (max-width: 768px) {
+    .layout-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 16px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-card);
+    }
+
+    .brand {
+        margin-bottom: 0px;
+        font-size: 1.25rem;
+    }
+
+    .sidebar nav {
+        display: none;
+        /* Ideally we would have a hamburger menu, but for now let's simplify: 
+           show icons only or a horizontal scroll? 
+           Let's try horizontal bar first or just keep it simple. 
+           Actually, let's make a horizontal scroll nav below brand */
+        width: 100%;
+        overflow-x: auto;
+        padding-top: 10px;
+        display: flex;
+        gap: 8px;
+    }
+
+    .sidebar nav a {
+        white-space: nowrap;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+
+    .sidebar div[style*="margin-top: auto"] {
+        display: none;
+        /* Hide bottom links on mobile for space, or move into nav */
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 16px;
+        width: 100%;
+    }
+
+    .grid-cols-4 {
+        grid-template-columns: 1fr;
+        /* Stack cards */
+    }
+
+    /* Dashboard specific grid overrides */
+    div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    h1 {
+        font-size: 1.75rem;
+    }
+
+    /* Table responsiveness */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .glass-panel {
+        padding: 16px;
+        /* Smaller padding */
+    }
+
+    /* Adjust leads form */
+    form.grid-cols-4 {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    form.grid-cols-4>div {
+        width: 100%;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+    }
+}

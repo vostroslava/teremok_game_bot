@@ -12,6 +12,7 @@ class FormulaRSPResult:
     recommendations: List[str]
     emoji: str
     result_object: Optional[RSPTypeData] = field(default=None)
+    id: Optional[int] = None
 
 def compute_formula_rsp(answers: List[str]) -> FormulaRSPResult:
     """
@@ -26,6 +27,9 @@ def compute_formula_rsp(answers: List[str]) -> FormulaRSPResult:
     
     # Count scores
     for ans in answers:
+        if isinstance(ans, dict):
+            ans = ans.get('value')
+            
         if ans in scores:
             scores[ans] += 1
             

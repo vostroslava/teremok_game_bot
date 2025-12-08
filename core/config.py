@@ -20,7 +20,19 @@ class Settings:
     PORT: int = int(os.getenv("PORT", "8000"))
     
     # Database
-    DB_NAME: str = os.getenv("DB_NAME", "teremok.db")
+    DB_TYPE: str = os.getenv("DB_TYPE", "postgres") # postgres or sqlite (legacy)
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "teremok")
+    
+    # Legacy/Fallback
+    SQLITE_DB_NAME: str = os.getenv("DB_NAME", "teremok.db")
+
+    @property
+    def DATABASE_URL(self) -> str:
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     # Channel subscription check
     REQUIRED_CHANNEL_USERNAME: str = os.getenv("REQUIRED_CHANNEL_USERNAME", "testtesttest12332221")

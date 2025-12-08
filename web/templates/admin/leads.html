@@ -180,7 +180,11 @@
         feather.replace();
 
         try {
-            const response = await fetch('/app/admin/api/export/leads', { method: 'POST' });
+            // Get key from hidden input
+            const key = document.querySelector('input[name="key"]').value;
+            const url = '/app/admin/api/export/leads' + (key ? `?key=${key}` : '');
+
+            const response = await fetch(url, { method: 'POST' });
             const data = await response.json();
 
             if (data.status === 'ok') {

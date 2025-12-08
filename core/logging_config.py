@@ -45,7 +45,8 @@ def setup_logging(log_level="INFO", log_file="app.log"):
     logger.addHandler(file_handler)
     
     # Quiet down some noisy libraries
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+    # Quiet down some noisy libraries
+    logging.getLogger("asyncpg").setLevel(logging.WARNING)
     logging.getLogger("multipart").setLevel(logging.WARNING)
     
     return logger

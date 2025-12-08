@@ -9,7 +9,7 @@ from core.telegram_checks import is_subscribed_to_required_channel
 from core.logic import calculate_result, DIAGNOSTIC_QUESTIONS
 import os
 import logging
-import aiosqlite
+import asyncpg
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from core.limiter import limiter
@@ -243,13 +243,11 @@ async def teremok_result_page(request: Request, result_id: int):
     """Страница результата теста"""
     try:
         # Fetch result from DB
-        # We need a new detailed getter or just generic query
-        # Since we don't have get_test_result_by_id in db yet, let's look at available methods
-        # Or add a quick one right here or in db
-        async with aiosqlite.connect(settings.DB_NAME) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM test_results WHERE id = ?", (result_id,)) as cursor:
-                row = await cursor.fetchone()
+        conn = await asyncpg.connect(settings.DATABASE_URL)
+        try:
+            row = await conn.fetchrow("SELECT * FROM test_results WHERE id = $1", result_id)
+        finally:
+            await conn.close()
                 
         if not row:
             return HTMLResponse("<h1>Результат не найден</h1>", status_code=404)
@@ -446,7 +444,7 @@ async def submit_formula_rsp_results(request: Request):
             await export_test_to_sheets(
                 test={
                     "user_id": user_id, 
-                    "result_type": result_obj.primary_type_name,
+                    "result_type": result_obj.primary_name,
                     "scores": result_obj.scores,
                     "product": "formula_rsp",
                     "test_id": test_id,
@@ -463,7 +461,7 @@ async def submit_formula_rsp_results(request: Request):
             await notification_service.notify_test_result(
                 user_id=user_id,
                 contact=contact,
-                result_type=result_obj.primary_type_name,
+                result_type=result_obj.primary_name,
                 answers=answers,
                 product="formula_rsp",
                 scores=result_obj.scores
@@ -606,5 +604,10 @@ from fastapi.responses import RedirectResponse
 async def read_root():
     """Redirect root to main hub"""
     return RedirectResponse(url="/app/hub")
+
+@app.get("/admin")
+async def admin_root():
+    """Redirect /admin to /app/admin/dashboard"""
+    return RedirectResponse(url="/app/admin/dashboard")
 
 
